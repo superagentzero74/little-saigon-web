@@ -89,7 +89,7 @@ export default function GuidePage() {
                       {section.titleViet} · {section.range}
                     </p>
                   </div>
-                  <div className="space-y-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-sm">
                     {section.dishes.map((dish) => (
                       <DishCard key={dish.id} dish={dish} variant="full" />
                     ))}
