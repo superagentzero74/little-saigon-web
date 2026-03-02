@@ -17,7 +17,7 @@ import {
   submitReview, hasUserReviewed, checkIn, toggleFavorite,
   uploadBusinessPhoto, getUserFavorites,
 } from "@/lib/services";
-import { isCurrentlyOpen, formatPriceLevel, getDirectionsUrl } from "@/lib/utils";
+import { isCurrentlyOpen, formatPriceLevel, getDirectionsUrl, getStaticMapUrl } from "@/lib/utils";
 import StarRating from "@/components/ui/StarRating";
 import OpenStatus from "@/components/ui/OpenStatus";
 
@@ -414,11 +414,16 @@ export default function BusinessDetailPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-[72px] space-y-lg">
               <div className="ls-card overflow-hidden p-0">
-                <a href={getDirectionsUrl(business)} target="_blank" rel="noopener noreferrer" className="block">
-                  <div className="h-[180px] bg-ls-surface flex items-center justify-center">
-                    <div className="text-center">
-                      <MapPin size={32} className="text-ls-secondary mx-auto" />
-                      <p className="text-tag text-ls-secondary mt-sm">View on Google Maps</p>
+                <a href={getDirectionsUrl(business)} target="_blank" rel="noopener noreferrer" className="block group">
+                  <div className="relative h-[180px] bg-ls-surface overflow-hidden">
+                    <Image
+                      src={getStaticMapUrl(business.latitude, business.longitude, 15, "600x360")}
+                      alt={`Map of ${business.name}`}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[12px] text-center py-[6px] flex items-center justify-center gap-xs">
+                      <MapPin size={12} /> View on Google Maps
                     </div>
                   </div>
                 </a>
