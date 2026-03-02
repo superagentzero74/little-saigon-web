@@ -10,11 +10,25 @@ import { getTopRatedBusinesses, getDishes, searchBusinesses } from "@/lib/servic
 import BusinessFeaturedCard from "@/components/business/BusinessFeaturedCard";
 import DishCard from "@/components/guide/DishCard";
 
+const HERO_IMAGES = [
+  { src: "/hero-1.webp", alt: "Asian Garden Mall — Phước Lộc Thọ" },
+  { src: "/hero-2.jpg", alt: "Tết celebration at Phước Lộc Thọ" },
+  { src: "/hero-3.jpg", alt: "Today Plaza — Thương Xá Kim Nhật" },
+];
+
 export default function HomePage() {
   const [topRated, setTopRated] = useState<Business[]>([]);
   const [dishes, setDishes] = useState<MonVietDish[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [heroIndex, setHeroIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroIndex((i) => (i + 1) % HERO_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -47,17 +61,31 @@ export default function HomePage() {
     <div>
       {/* ============ Hero ============ */}
       <section className="relative text-white overflow-hidden">
-        {/* Background image */}
+        {/* Background slideshow */}
         <div className="absolute inset-0">
-          <Image
-            src="/hero-1.webp"
-            alt="Little Saigon — Asian Garden Mall, Phước Lộc Thọ"
-            fill
-            className="object-cover object-center"
-            priority
-          />
+          {HERO_IMAGES.map((img, i) => (
+            <Image
+              key={img.src}
+              src={img.src}
+              alt={img.alt}
+              fill
+              className={`object-cover object-center transition-opacity duration-1000 ${i === heroIndex ? "opacity-100" : "opacity-0"}`}
+              priority={i === 0}
+            />
+          ))}
           {/* Dark overlay */}
           <div className="absolute inset-0 bg-black/60" />
+        </div>
+
+        {/* Slide dots */}
+        <div className="absolute bottom-md left-1/2 -translate-x-1/2 flex gap-[6px] z-10">
+          {HERO_IMAGES.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setHeroIndex(i)}
+              className={`w-[8px] h-[8px] rounded-full transition-all ${i === heroIndex ? "bg-white scale-125" : "bg-white/40"}`}
+            />
+          ))}
         </div>
 
         {/* Content */}
