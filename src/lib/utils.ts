@@ -13,7 +13,8 @@ export function businessSlug(business: Business): string {
     .replace(/[Đ]/g, "D")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return `${nameSlug}-${business.id.slice(0, 8)}`;
+  // Use double-dash to separate name from full ID for reliable extraction
+  return `${nameSlug}--${business.id}`;
 }
 
 /**

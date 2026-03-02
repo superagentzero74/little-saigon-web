@@ -50,32 +50,27 @@ export default function BusinessDetailPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const idPrefix = slug.slice(-8); // slug always ends with first 8 chars of Firestore ID
-      const { db: fireDb } = await import("@/lib/firebase");
-      const { collection, getDocs, query: fbQuery } = await import("firebase/firestore");
+      // Slug format: "{nameSlug}--{fullFirestoreId}"
+      const businessId = slug.includes("--") ? slug.split("--").slice(1).join("--") : slug.slice(-8);
+      const biz = await getBusinessById(businessId);
 
-      const q = fbQuery(collection(fireDb, "businesses"));
-      const snapshot = await getDocs(q);
-      const match = snapshot.docs.find((d) => d.id.startsWith(idPrefix));
-
-      if (match) {
-        const biz = { id: match.id, ...match.data() } as Business;
+      if (biz) {
         setBusiness(biz);
 
         const [revResult, picResult] = await Promise.allSettled([
-          getReviewsForBusiness(match.id),
-          getBusinessPhotos(match.id),
+          getReviewsForBusiness(biz.id),
+          getBusinessPhotos(biz.id),
         ]);
         if (revResult.status === "fulfilled") setReviews(revResult.value);
         if (picResult.status === "fulfilled") setPhotos(picResult.value);
 
         if (user) {
           const [reviewed, favs] = await Promise.all([
-            hasUserReviewed(match.id, user.id),
+            hasUserReviewed(biz.id, user.id),
             getUserFavorites(user.id),
           ]);
           setAlreadyReviewed(reviewed);
-          setIsFavorited(favs.includes(match.id));
+          setIsFavorited(favs.includes(biz.id));
         }
       }
     } catch (err) {
