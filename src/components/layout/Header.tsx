@@ -21,7 +21,7 @@ export default function Header() {
             alt="Little Saigon Official"
             width={160}
             height={40}
-            className="h-[32px] w-auto"
+            className="h-[48px] w-auto"
           />
         </Link>
 
