@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X } from "lucide-react";
 
@@ -15,7 +16,14 @@ export default function Header() {
       <div className="ls-container flex items-center justify-between h-[56px]">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-sm">
-          <span className="text-[20px] font-bold tracking-tight text-ls-primary">
+          <Image
+            src="/logo.png"
+            alt="Little Saigon"
+            width={36}
+            height={36}
+            className="rounded-[8px]"
+          />
+          <span className="text-[18px] font-bold tracking-tight text-ls-primary">
             Little Saigon
           </span>
         </Link>
