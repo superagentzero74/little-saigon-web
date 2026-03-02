@@ -21,14 +21,20 @@ export async function getBusinesses(options?: {
   startAfterDoc?: DocumentSnapshot;
 }): Promise<{ businesses: Business[]; lastDoc: DocumentSnapshot | null }> {
   const constraints: any[] = [];
+  // Only use orderBy when there's no category filter (composite index not available)
+  if (!options?.category) {
+    constraints.push(orderBy("rating", "desc"));
+  }
   if (options?.category) constraints.push(where("category", "==", options.category));
-  constraints.push(orderBy("rating", "desc"));
   constraints.push(limit(options?.limitCount || 24));
   if (options?.startAfterDoc) constraints.push(startAfter(options.startAfterDoc));
 
   const q = query(collection(db, "businesses"), ...constraints);
   const snapshot = await getDocs(q);
-  const businesses = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
+  const businesses = snapshot.docs
+    .map((d) => ({ id: d.id, ...d.data() })) as Business[];
+  // Sort client-side when category filter is applied
+  if (options?.category) businesses.sort((a, b) => b.rating - a.rating);
   return { businesses, lastDoc: snapshot.docs[snapshot.docs.length - 1] || null };
 }
 
@@ -38,10 +44,11 @@ export async function getBusinessById(id: string): Promise<Business | null> {
   return { id: snap.id, ...snap.data() } as Business;
 }
 
-export async function getBusinessesByCategory(category: BusinessCategory, limitCount = 12): Promise<Business[]> {
-  const q = query(collection(db, "businesses"), where("category", "==", category), orderBy("rating", "desc"), limit(limitCount));
+export async function getBusinessesByCategory(category: BusinessCategory, limitCount = 100): Promise<Business[]> {
+  const q = query(collection(db, "businesses"), where("category", "==", category), limit(limitCount));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() })) as Business[];
 }
 
 export async function getTopRatedBusinesses(limitCount = 12): Promise<Business[]> {
