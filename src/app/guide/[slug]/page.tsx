@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, UtensilsCrossed, Search, Check, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, UtensilsCrossed, Search, Check, ArrowRight, Trophy } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { MonVietDish, Business } from "@/lib/types";
-import { getDishes, searchBusinesses, toggleDishChecked, getUserProfile } from "@/lib/services";
+import { businessSlug } from "@/lib/utils";
+import { getDishes, searchBusinesses, toggleDishChecked, getUserProfile, getDishFeatured } from "@/lib/services";
 import BusinessCard from "@/components/business/BusinessCard";
 
 export default function DishDetailPage() {
@@ -19,6 +20,7 @@ export default function DishDetailPage() {
   const [dish, setDish] = useState<MonVietDish | null>(null);
   const [allDishes, setAllDishes] = useState<MonVietDish[]>([]);
   const [nearbyBusinesses, setNearbyBusinesses] = useState<Business[]>([]);
+  const [featuredBusinesses, setFeaturedBusinesses] = useState<Business[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,10 +38,12 @@ export default function DishDetailPage() {
 
         if (found) {
           setDish(found);
-          if (found.searchQuery) {
-            const results = await searchBusinesses(found.searchQuery);
-            setNearbyBusinesses(results.slice(0, 6));
-          }
+          const [nearbyResults, featuredResults] = await Promise.all([
+            found.searchQuery ? searchBusinesses(found.searchQuery) : Promise.resolve([]),
+            getDishFeatured(found.rank),
+          ]);
+          setNearbyBusinesses(nearbyResults.slice(0, 6));
+          setFeaturedBusinesses(featuredResults);
           if (user) {
             const profile = await getUserProfile(user.id);
             setIsChecked(profile?.checkedDishes?.includes(found.rank) || false);
@@ -193,6 +197,42 @@ export default function DishDetailPage() {
                     <p className="text-body text-ls-body leading-relaxed">{dish.history}</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Best of Little Saigon */}
+            {featuredBusinesses.length > 0 && (
+              <div className="mt-2xl">
+                <div className="flex items-center gap-sm mb-md">
+                  <Trophy size={15} className="text-ls-primary" />
+                  <h2 className="text-[15px] font-semibold text-ls-primary">Best of Little Saigon</h2>
+                </div>
+                <div className="space-y-sm">
+                  {featuredBusinesses.map((biz, i) => {
+                    const medals = [
+                      { bg: "bg-amber-400", label: "1st" },
+                      { bg: "bg-slate-400", label: "2nd" },
+                      { bg: "bg-amber-700", label: "3rd" },
+                    ];
+                    const medal = medals[i] || medals[2];
+                    return (
+                      <Link
+                        key={biz.id}
+                        href={`/business/${businessSlug(biz)}`}
+                        className="ls-card flex items-center gap-md group hover:shadow-md transition-shadow"
+                      >
+                        <div className={`w-[32px] h-[32px] rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ${medal.bg}`}>
+                          {medal.label}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-semibold text-ls-primary truncate group-hover:underline">{biz.name}</p>
+                          <p className="text-[12px] text-ls-secondary truncate">{biz.address}</p>
+                        </div>
+                        <ArrowRight size={16} className="text-ls-secondary flex-shrink-0" />
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

@@ -171,6 +171,18 @@ export const CATEGORIES: Record<BusinessCategory, { label: string; icon: string 
   business: { label: "Business", icon: "🏢" },
 };
 
+export interface DishFeaturedEntry {
+  businessId: string;
+  rank: number;
+}
+
+export interface DishFeatured {
+  dishRank: number;
+  entries: DishFeaturedEntry[];
+  updatedAt?: any;
+  updatedBy?: string;
+}
+
 export const POINTS = {
   REVIEW: 25,
   CHECK_IN: 10,

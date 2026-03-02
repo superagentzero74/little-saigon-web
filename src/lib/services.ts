@@ -7,7 +7,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type {
   Business, BusinessPhoto, Review, MonVietDish, BusinessCategory,
-  AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection,
+  AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection, DishFeaturedEntry,
 } from "./types";
 import { POINTS } from "./types";
 
@@ -379,6 +379,29 @@ export async function getDishByRank(rank: number): Promise<MonVietDish | null> {
   const snap = await getDocs(q);
   if (snap.empty) return null;
   return mapFoodDoc(snap.docs[0].id, snap.docs[0].data());
+}
+
+// ============================================
+// Dish Featured ("Best of Little Saigon")
+// ============================================
+
+export async function getDishFeatured(dishRank: number): Promise<Business[]> {
+  const snap = await getDoc(doc(db, "dishFeatured", String(dishRank)));
+  if (!snap.exists()) return [];
+  const entries: DishFeaturedEntry[] = snap.data()?.entries || [];
+  const sorted = [...entries].sort((a, b) => a.rank - b.rank);
+  const businesses = await Promise.all(sorted.map((e) => getBusinessById(e.businessId)));
+  return businesses.filter(Boolean) as Business[];
+}
+
+export async function setDishFeatured(dishRank: number, businessIds: string[]): Promise<void> {
+  const entries: DishFeaturedEntry[] = businessIds.map((id, i) => ({ businessId: id, rank: i + 1 }));
+  await setDoc(doc(db, "dishFeatured", String(dishRank)), {
+    dishRank,
+    entries,
+    updatedAt: serverTimestamp(),
+    updatedBy: auth.currentUser?.uid || null,
+  });
 }
 
 // ============================================
