@@ -361,8 +361,10 @@ function mapFoodDoc(docId: string, data: any): MonVietDish {
 }
 
 export async function getDishes(): Promise<MonVietDish[]> {
-  const snap = await getDocs(query(collection(db, "foods"), orderBy("id", "asc")));
-  return snap.docs.map((d) => mapFoodDoc(d.id, d.data()));
+  const snap = await getDocs(collection(db, "foods"));
+  return snap.docs
+    .map((d) => mapFoodDoc(d.id, d.data()))
+    .sort((a, b) => a.rank - b.rank);
 }
 
 export async function getDishByRank(rank: number): Promise<MonVietDish | null> {
