@@ -197,42 +197,40 @@ export default function BusinessDetailPage() {
         </div>
       )}
 
-      {/* Photo Carousel */}
+      {/* Photo Strip */}
       {displayPhotos.length > 0 && (
-        <div className="relative bg-ls-surface">
-          <div className="ls-container">
-            <div className="relative h-[280px] md:h-[400px] overflow-hidden rounded-b-card">
-              <Image
-                src={displayPhotos[photoIndex % displayPhotos.length]?.url || ""}
-                alt={`${business.name} photo`}
-                fill
-                className="object-cover"
-                priority
-              />
-              {displayPhotos.length > 1 && (
-                <>
-                  <button onClick={() => setPhotoIndex((i) => (i === 0 ? displayPhotos.length - 1 : i - 1))}
-                    className="absolute left-md top-1/2 -translate-y-1/2 w-[36px] h-[36px] bg-white/90 rounded-full flex items-center justify-center">
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button onClick={() => setPhotoIndex((i) => (i === displayPhotos.length - 1 ? 0 : i + 1))}
-                    className="absolute right-md top-1/2 -translate-y-1/2 w-[36px] h-[36px] bg-white/90 rounded-full flex items-center justify-center">
-                    <ChevronRight size={20} />
-                  </button>
-                </>
-              )}
-              <div className="absolute bottom-md right-md bg-black/60 text-white text-tag px-md py-xs rounded-badge">
-                {(photoIndex % displayPhotos.length) + 1} / {displayPhotos.length}
-              </div>
-              {/* Favorite button */}
-              <button
-                onClick={handleFavorite}
-                className="absolute top-md right-md w-[40px] h-[40px] bg-white/90 rounded-full flex items-center justify-center"
+        <div className="relative bg-black">
+          <div className="flex h-[260px] md:h-[380px] overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+            {displayPhotos.map((photo, i) => (
+              <div
+                key={photo.id}
+                className="relative flex-shrink-0 snap-start cursor-pointer"
+                style={{ width: displayPhotos.length === 1 ? "100%" : "calc(100% - 60px)", maxWidth: 700 }}
+                onClick={() => setPhotoIndex(i)}
               >
-                <Heart size={20} className={isFavorited ? "fill-ls-heart text-ls-heart" : "text-ls-primary"} />
-              </button>
-            </div>
+                <Image
+                  src={photo.url}
+                  alt={`${business.name} photo ${i + 1}`}
+                  fill
+                  className="object-cover"
+                  priority={i === 0}
+                />
+                {/* Gap between photos */}
+                <div className="absolute inset-y-0 right-0 w-[3px] bg-black" />
+              </div>
+            ))}
           </div>
+          {/* Photo count badge */}
+          <div className="absolute bottom-md left-md bg-black/60 text-white text-tag px-md py-xs rounded-badge">
+            {displayPhotos.length} {displayPhotos.length === 1 ? "photo" : "photos"}
+          </div>
+          {/* Favorite button */}
+          <button
+            onClick={handleFavorite}
+            className="absolute top-md right-md w-[40px] h-[40px] bg-white/90 rounded-full flex items-center justify-center"
+          >
+            <Heart size={20} className={isFavorited ? "fill-ls-heart text-ls-heart" : "text-ls-primary"} />
+          </button>
         </div>
       )}
 
