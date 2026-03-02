@@ -17,7 +17,7 @@ import {
   submitReview, hasUserReviewed, checkIn, toggleFavorite,
   uploadBusinessPhoto, getUserFavorites,
 } from "@/lib/services";
-import { isCurrentlyOpen, formatPriceLevel, getDirectionsUrl, getStaticMapUrl } from "@/lib/utils";
+import { isCurrentlyOpen, formatPriceLevel, getDirectionsUrl } from "@/lib/utils";
 import StarRating from "@/components/ui/StarRating";
 import OpenStatus from "@/components/ui/OpenStatus";
 
@@ -409,18 +409,23 @@ export default function BusinessDetailPage() {
           <div className="lg:col-span-1">
             <div className="sticky top-[72px] space-y-lg">
               <div className="ls-card overflow-hidden p-0">
-                <a href={getDirectionsUrl(business)} target="_blank" rel="noopener noreferrer" className="block group">
-                  <div className="relative h-[180px] bg-ls-surface overflow-hidden">
-                    <Image
-                      src={getStaticMapUrl(business.latitude, business.longitude, 15, "600x360")}
-                      alt={`Map of ${business.name}`}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[12px] text-center py-[6px] flex items-center justify-center gap-xs">
-                      <MapPin size={12} /> View on Google Maps
-                    </div>
-                  </div>
+                <div className="relative h-[180px]">
+                  <iframe
+                    src={`https://maps.google.com/maps?q=${business.latitude},${business.longitude}&z=15&output=embed`}
+                    width="100%"
+                    height="180"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    title={`Map of ${business.name}`}
+                  />
+                </div>
+                <a
+                  href={getDirectionsUrl(business)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-xs text-[12px] text-ls-secondary hover:text-ls-primary py-[10px] border-t border-ls-border transition-colors"
+                >
+                  <MapPin size={12} /> View on Google Maps
                 </a>
               </div>
 
