@@ -7,7 +7,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type {
   Business, BusinessPhoto, Review, MonVietDish, BusinessCategory,
-  AppUser, CheckIn, Reward, Redemption, PhotoTag,
+  AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection,
 } from "./types";
 import { POINTS } from "./types";
 
@@ -327,14 +327,27 @@ async function awardPoints(userId: string, points: number, action: string, busin
 // Top 50 Món Việt
 // ============================================
 
+// Infer dish section from rank when not stored in Firestore
+function sectionFromRank(rank: number): DishSection {
+  if (rank <= 10) return "noodle_soups";
+  if (rank <= 15) return "dry_noodles";
+  if (rank <= 20) return "rice";
+  if (rank <= 29) return "banh";
+  if (rank <= 34) return "rolls";
+  if (rank <= 42) return "grilled";
+  if (rank <= 46) return "sides";
+  return "sweets";
+}
+
 // Maps Firestore foods doc fields to the web MonVietDish type
 function mapFoodDoc(docId: string, data: any): MonVietDish {
+  const rank = data.id ?? parseInt(docId);
   return {
     id: docId,
-    rank: data.id ?? parseInt(docId),           // Firestore uses 'id' (Int) as the rank
+    rank,                                        // Firestore uses 'id' (Int) as the rank
     name: data.vietnameseName ?? data.name ?? "",
     englishName: data.englishName ?? "",
-    section: data.section ?? "other",
+    section: data.section ?? sectionFromRank(rank),
     sectionTitle: data.sectionTitle ?? "",
     sectionTitleViet: data.sectionTitleViet ?? "",
     shortDescription: data.shortDescription ?? "",

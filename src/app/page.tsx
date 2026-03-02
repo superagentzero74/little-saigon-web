@@ -18,14 +18,14 @@ export default function HomePage() {
   useEffect(() => {
     async function load() {
       try {
-        const [businesses, allDishes] = await Promise.all([
+        const [bizResult, dishResult] = await Promise.allSettled([
           getTopRatedBusinesses(12),
           getDishes(),
         ]);
-        setTopRated(businesses);
-        setDishes(allDishes.slice(0, 8)); // First 8 for teaser
-      } catch (err) {
-        console.error("Failed to load homepage data:", err);
+        if (bizResult.status === "fulfilled") setTopRated(bizResult.value);
+        else console.error("Failed to load businesses:", bizResult.reason);
+        if (dishResult.status === "fulfilled") setDishes(dishResult.value.slice(0, 8));
+        else console.error("Failed to load dishes:", dishResult.reason);
       } finally {
         setLoading(false);
       }
