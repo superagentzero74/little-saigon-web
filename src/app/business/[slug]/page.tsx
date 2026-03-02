@@ -50,7 +50,7 @@ export default function BusinessDetailPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const idPrefix = slug.split("-").pop() || "";
+      const idPrefix = slug.slice(-8); // slug always ends with first 8 chars of Firestore ID
       const { db: fireDb } = await import("@/lib/firebase");
       const { collection, getDocs, query: fbQuery } = await import("firebase/firestore");
 
