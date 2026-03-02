@@ -49,35 +49,40 @@ export default function BusinessDetailPage() {
   const [photoFilter, setPhotoFilter] = useState<PhotoTag | "all">("all");
 
   const loadData = useCallback(async () => {
-    const idPrefix = slug.split("-").pop() || "";
-    const { db: fireDb } = await import("@/lib/firebase");
-    const { collection, getDocs, query: fbQuery } = await import("firebase/firestore");
+    try {
+      const idPrefix = slug.split("-").pop() || "";
+      const { db: fireDb } = await import("@/lib/firebase");
+      const { collection, getDocs, query: fbQuery } = await import("firebase/firestore");
 
-    const q = fbQuery(collection(fireDb, "businesses"));
-    const snapshot = await getDocs(q);
-    const match = snapshot.docs.find((d) => d.id.startsWith(idPrefix));
+      const q = fbQuery(collection(fireDb, "businesses"));
+      const snapshot = await getDocs(q);
+      const match = snapshot.docs.find((d) => d.id.startsWith(idPrefix));
 
-    if (match) {
-      const biz = { id: match.id, ...match.data() } as Business;
-      setBusiness(biz);
+      if (match) {
+        const biz = { id: match.id, ...match.data() } as Business;
+        setBusiness(biz);
 
-      const [revs, pics] = await Promise.all([
-        getReviewsForBusiness(match.id),
-        getBusinessPhotos(match.id),
-      ]);
-      setReviews(revs);
-      setPhotos(pics);
-
-      if (user) {
-        const [reviewed, favs] = await Promise.all([
-          hasUserReviewed(match.id, user.id),
-          getUserFavorites(user.id),
+        const [revResult, picResult] = await Promise.allSettled([
+          getReviewsForBusiness(match.id),
+          getBusinessPhotos(match.id),
         ]);
-        setAlreadyReviewed(reviewed);
-        setIsFavorited(favs.includes(match.id));
+        if (revResult.status === "fulfilled") setReviews(revResult.value);
+        if (picResult.status === "fulfilled") setPhotos(picResult.value);
+
+        if (user) {
+          const [reviewed, favs] = await Promise.all([
+            hasUserReviewed(match.id, user.id),
+            getUserFavorites(user.id),
+          ]);
+          setAlreadyReviewed(reviewed);
+          setIsFavorited(favs.includes(match.id));
+        }
       }
+    } catch (err) {
+      console.error("Failed to load business:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [slug, user]);
 
   useEffect(() => { loadData(); }, [loadData]);
