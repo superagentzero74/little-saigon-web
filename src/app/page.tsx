@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Search, ArrowRight, MapPin, ChevronRight } from "lucide-react";
 import type { Business, MonVietDish, BusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
@@ -45,15 +46,29 @@ export default function HomePage() {
   return (
     <div>
       {/* ============ Hero ============ */}
-      <section className="bg-ls-primary text-white">
-        <div className="ls-container py-[48px] md:py-[64px]">
-          <p className="text-meta text-white/60 uppercase tracking-widest mb-sm">
+      <section className="relative text-white overflow-hidden">
+        {/* Background image */}
+        <div className="absolute inset-0">
+          <Image
+            src="/hero-1.webp"
+            alt="Little Saigon — Asian Garden Mall, Phước Lộc Thọ"
+            fill
+            className="object-cover object-center"
+            priority
+          />
+          {/* Dark overlay */}
+          <div className="absolute inset-0 bg-black/60" />
+        </div>
+
+        {/* Content */}
+        <div className="relative ls-container py-[64px] md:py-[96px]">
+          <p className="text-meta text-white/70 uppercase tracking-widest mb-sm">
             Westminster · Garden Grove · Fountain Valley
           </p>
-          <h1 className="text-[36px] md:text-[48px] font-bold leading-tight">
+          <h1 className="text-[36px] md:text-[52px] font-bold leading-tight">
             Xin Chào!
           </h1>
-          <p className="text-[18px] text-white/70 mt-sm max-w-lg">
+          <p className="text-[18px] text-white/80 mt-sm max-w-lg">
             Discover the best Vietnamese restaurants, businesses, and services in Little Saigon, Southern California.
           </p>
 
