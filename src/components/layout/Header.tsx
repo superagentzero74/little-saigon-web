@@ -15,17 +15,14 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-white border-b border-ls-border">
       <div className="ls-container flex items-center justify-between h-[56px]">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-sm">
+        <Link href="/">
           <Image
-            src="/logo.png"
-            alt="Little Saigon"
-            width={36}
-            height={36}
-            className="rounded-[8px]"
+            src="/lso-logo.png"
+            alt="Little Saigon Official"
+            width={160}
+            height={40}
+            className="h-[32px] w-auto"
           />
-          <span className="text-[18px] font-bold tracking-tight text-ls-primary">
-            Little Saigon
-          </span>
         </Link>
 
         {/* Desktop Nav */}
