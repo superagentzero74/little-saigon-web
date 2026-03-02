@@ -1,0 +1,139 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X } from "lucide-react";
+
+export default function Header() {
+  const { user, loading, logout } = useAuth();
+  const [showMenu, setShowMenu] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
+
+  return (
+    <header className="sticky top-0 z-50 bg-white border-b border-ls-border">
+      <div className="ls-container flex items-center justify-between h-[56px]">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-sm">
+          <span className="text-[20px] font-bold tracking-tight text-ls-primary">
+            Little Saigon
+          </span>
+        </Link>
+
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-xl">
+          <Link href="/explore" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
+            <Compass size={16} /> Explore
+          </Link>
+          <Link href="/guide" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
+            <BookOpen size={16} /> Top 50 Món Việt
+          </Link>
+          <Link href="/rewards" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
+            <Gift size={16} /> Rewards
+          </Link>
+
+          {loading ? (
+            <div className="w-[32px] h-[32px] rounded-full bg-ls-surface animate-pulse" />
+          ) : user ? (
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="flex items-center gap-sm"
+              >
+                <div className="w-[32px] h-[32px] rounded-full bg-ls-primary flex items-center justify-center">
+                  <span className="text-[13px] font-semibold text-white">
+                    {user.displayName?.charAt(0)?.toUpperCase() || "?"}
+                  </span>
+                </div>
+                <div className="hidden lg:block text-left">
+                  <p className="text-[13px] font-semibold text-ls-primary leading-tight">
+                    {user.displayName}
+                  </p>
+                  <p className="text-[11px] text-ls-secondary leading-tight">
+                    {user.points} pts
+                  </p>
+                </div>
+              </button>
+
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-[44px] z-50 bg-white border border-ls-border rounded-card w-[200px] py-sm">
+                    <Link
+                      href="/profile"
+                      onClick={() => setShowMenu(false)}
+                      className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-primary hover:bg-ls-surface transition-colors"
+                    >
+                      <User size={16} /> Profile
+                    </Link>
+                    <Link
+                      href="/rewards"
+                      onClick={() => setShowMenu(false)}
+                      className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-primary hover:bg-ls-surface transition-colors"
+                    >
+                      <Gift size={16} /> Rewards
+                    </Link>
+                    <hr className="my-xs border-ls-border" />
+                    <button
+                      onClick={() => { logout(); setShowMenu(false); }}
+                      className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-secondary hover:text-ls-primary hover:bg-ls-surface transition-colors w-full"
+                    >
+                      <LogOut size={16} /> Sign Out
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <Link href="/login" className="ls-btn text-[13px] py-sm px-lg">
+              Sign In
+            </Link>
+          )}
+        </nav>
+
+        {/* Mobile Hamburger */}
+        <button
+          className="md:hidden p-sm"
+          onClick={() => setShowMobileNav(!showMobileNav)}
+        >
+          {showMobileNav ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
+      {/* Mobile Nav Drawer */}
+      {showMobileNav && (
+        <div className="md:hidden border-t border-ls-border bg-white pb-lg">
+          <nav className="ls-container flex flex-col gap-sm pt-md">
+            <Link href="/explore" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+              <Compass size={18} /> Explore
+            </Link>
+            <Link href="/guide" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+              <BookOpen size={18} /> Top 50 Món Việt
+            </Link>
+            <Link href="/rewards" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+              <Gift size={18} /> Rewards
+            </Link>
+            <hr className="border-ls-border" />
+            {user ? (
+              <>
+                <Link href="/profile" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+                  <User size={18} /> Profile · {user.points} pts
+                </Link>
+                <button
+                  onClick={() => { logout(); setShowMobileNav(false); }}
+                  className="flex items-center gap-sm py-sm text-[15px] text-ls-secondary"
+                >
+                  <LogOut size={18} /> Sign Out
+                </button>
+              </>
+            ) : (
+              <Link href="/login" onClick={() => setShowMobileNav(false)} className="ls-btn text-center mt-sm">
+                Sign In
+              </Link>
+            )}
+          </nav>
+        </div>
+      )}
+    </header>
+  );
+}

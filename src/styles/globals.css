@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   Little Saigon — Global Styles
+   Design System: Clean, minimal, iOS-native feel
+   No gradients. No shadows. Content-first.
+   ============================================ */
+
+@layer base {
+  body {
+    @apply bg-white text-ls-primary font-sans antialiased;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Card — 1px border, no shadow */
+  .ls-card {
+    @apply bg-white border border-ls-border rounded-card p-lg transition-colors;
+  }
+  .ls-card:hover {
+    background-color: #fafafa;
+  }
+
+  /* Category Pill — inactive */
+  .ls-pill {
+    @apply bg-ls-surface text-ls-primary rounded-pill px-lg py-sm text-meta cursor-pointer transition-colors;
+  }
+  .ls-pill-active {
+    @apply bg-ls-primary text-white rounded-pill px-lg py-sm text-meta cursor-pointer;
+  }
+
+  /* Primary Button */
+  .ls-btn {
+    @apply bg-ls-primary text-white rounded-btn px-8 py-3.5 text-[15px] font-semibold transition-opacity;
+  }
+  .ls-btn:hover {
+    @apply opacity-90;
+  }
+
+  /* Secondary Button */
+  .ls-btn-secondary {
+    @apply bg-ls-surface text-ls-primary rounded-btn px-8 py-3.5 text-[15px] font-semibold transition-colors;
+  }
+
+  /* Tag / Badge */
+  .ls-tag {
+    @apply bg-ls-surface text-ls-primary rounded-badge px-md py-xs text-tag;
+  }
+
+  /* Star Rating */
+  .ls-star-filled {
+    color: #242424;
+    fill: #242424;
+  }
+  .ls-star-empty {
+    color: #d1d1d1;
+    fill: none;
+    stroke: #d1d1d1;
+  }
+
+  /* Section spacing */
+  .ls-section {
+    @apply py-2xl;
+  }
+
+  /* Page container */
+  .ls-container {
+    @apply max-w-6xl mx-auto px-xl;
+  }
+}
