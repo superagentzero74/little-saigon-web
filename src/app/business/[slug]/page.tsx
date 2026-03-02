@@ -85,7 +85,7 @@ export default function BusinessDetailPage() {
     }
   }, [slug, user]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { window.scrollTo(0, 0); loadData(); }, [loadData]);
 
   // Handlers
   const handleFavorite = async () => {
