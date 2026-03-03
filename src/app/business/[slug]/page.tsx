@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   MapPin, Phone, Globe, Clock, ChevronLeft, ChevronRight, Navigation,
-  Star, Heart, Camera, CheckCircle, X, Pencil,
+  Star, Heart, Camera, CheckCircle, X, Pencil, Building2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "@/contexts/LocationContext";
@@ -15,7 +15,7 @@ import { CATEGORIES } from "@/lib/types";
 import {
   getBusinessById, getReviewsForBusiness, getBusinessPhotos,
   submitReview, updateReview, getUserReviewForBusiness, checkIn, toggleFavorite,
-  uploadBusinessPhoto, getUserFavorites,
+  uploadBusinessPhoto, getUserFavorites, getUserClaimForBusiness, submitClaimRequest,
 } from "@/lib/services";
 import { isCurrentlyOpen, formatPriceLevel, getDirectionsUrl } from "@/lib/utils";
 import StarRating from "@/components/ui/StarRating";
@@ -48,6 +48,10 @@ export default function BusinessDetailPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [message, setMessage] = useState("");
   const [photoFilter, setPhotoFilter] = useState<PhotoTag | "all">("all");
+  const [claimStatus, setClaimStatus] = useState<"none" | "pending" | "approved" | "denied">("none");
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimNote, setClaimNote] = useState("");
+  const [submittingClaim, setSubmittingClaim] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -66,9 +70,10 @@ export default function BusinessDetailPage() {
         if (picResult.status === "fulfilled") setPhotos(picResult.value);
 
         if (user) {
-          const [existingReview, favs] = await Promise.all([
+          const [existingReview, favs, claimReq] = await Promise.all([
             getUserReviewForBusiness(biz.id, user.id),
             getUserFavorites(user.id),
+            user.role !== "admin" ? getUserClaimForBusiness(biz.id, user.id) : Promise.resolve(null),
           ]);
           if (existingReview) {
             setAlreadyReviewed(true);
@@ -77,6 +82,7 @@ export default function BusinessDetailPage() {
             setReviewText(existingReview.text || "");
           }
           setIsFavorited(favs.includes(biz.id));
+          if (claimReq) setClaimStatus(claimReq.status);
         }
       }
     } catch (err) {
@@ -163,6 +169,21 @@ export default function BusinessDetailPage() {
     }
   };
 
+  const handleClaimSubmit = async () => {
+    if (!user || !business) return;
+    setSubmittingClaim(true);
+    try {
+      await submitClaimRequest(business.id, business.name, claimNote);
+      setClaimStatus("pending");
+      setShowClaimModal(false);
+      setClaimNote("");
+    } catch (err: any) {
+      alert(err.message || "Failed to submit claim.");
+    } finally {
+      setSubmittingClaim(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="ls-container py-3xl">
@@ -195,15 +216,53 @@ export default function BusinessDetailPage() {
 
   return (
     <div>
-      {/* Admin floating edit button */}
-      {user?.role === "admin" && business && (
+      {/* Floating edit button for admin or business owner */}
+      {business && (user?.role === "admin" || (user?.role === "business_owner" && business.ownerId === user.id)) && (
         <Link
-          href={`/admin/businesses/${business.id}/edit`}
+          href={user?.role === "admin" ? `/admin/businesses/${business.id}/edit` : `/my-business/${business.id}/edit`}
           className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-ls-primary text-white flex items-center gap-xs pl-sm pr-md py-sm rounded-r-btn shadow-lg hover:bg-ls-primary/90 transition-colors"
         >
           <Pencil size={13} />
           <span className="text-[12px] font-semibold">Edit</span>
         </Link>
+      )}
+
+      {/* Claim modal */}
+      {showClaimModal && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-xl">
+          <div className="bg-white rounded-card p-2xl max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-between mb-lg">
+              <h2 className="text-[16px] font-bold text-ls-primary">Claim This Business</h2>
+              <button onClick={() => setShowClaimModal(false)}><X size={18} className="text-ls-secondary" /></button>
+            </div>
+            <p className="text-[13px] text-ls-body mb-lg">
+              Submit a claim to become the owner of <strong>{business?.name}</strong>. An admin will review and approve your request.
+            </p>
+            <textarea
+              value={claimNote}
+              onChange={(e) => setClaimNote(e.target.value.slice(0, 300))}
+              placeholder="Optional: explain your connection to this business (e.g. I am the owner)..."
+              rows={3}
+              className="w-full border border-ls-border rounded-btn p-md text-[13px] text-ls-primary outline-none resize-none placeholder:text-ls-secondary mb-sm"
+            />
+            <p className="text-[11px] text-ls-secondary mb-lg">{claimNote.length}/300</p>
+            <div className="flex gap-md justify-end">
+              <button
+                onClick={() => setShowClaimModal(false)}
+                className="ls-btn-secondary text-[13px] py-sm px-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClaimSubmit}
+                disabled={submittingClaim}
+                className="ls-btn text-[13px] py-sm px-lg disabled:opacity-50"
+              >
+                {submittingClaim ? "Submitting..." : "Submit Claim"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Check-in success overlay */}
@@ -476,6 +535,33 @@ export default function BusinessDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Claim My Business */}
+              {user && user.role !== "admin" && business.ownerId !== user.id && (
+                <div className="ls-card">
+                  <div className="flex items-center gap-sm mb-sm">
+                    <Building2 size={14} className="text-ls-secondary" />
+                    <h3 className="text-[12px] font-semibold text-ls-secondary uppercase tracking-wider">Own This Business?</h3>
+                  </div>
+                  {claimStatus === "none" && (
+                    <button
+                      onClick={() => setShowClaimModal(true)}
+                      className="text-[12px] text-ls-primary hover:underline font-medium"
+                    >
+                      Claim this business
+                    </button>
+                  )}
+                  {claimStatus === "pending" && (
+                    <p className="text-[12px] text-amber-600 font-medium">Claim pending review</p>
+                  )}
+                  {claimStatus === "approved" && (
+                    <p className="text-[12px] text-green-600 font-medium">Claim approved</p>
+                  )}
+                  {claimStatus === "denied" && (
+                    <p className="text-[12px] text-red-500 font-medium">Claim denied</p>
+                  )}
+                </div>
+              )}
 
               {business.hours && business.hours.length > 0 && (
                 <div className="ls-card">

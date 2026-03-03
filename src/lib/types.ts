@@ -34,8 +34,23 @@ export interface Business {
   longitude: number;
   placeId?: string;
   tags?: string[];
+  ownerId?: string;
   createdAt?: any;
   updatedAt?: any;
+}
+
+export interface ClaimRequest {
+  id: string;
+  businessId: string;
+  businessName: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  status: "pending" | "approved" | "denied";
+  note?: string;
+  createdAt?: any;
+  reviewedAt?: any;
+  reviewedBy?: string;
 }
 
 export interface BusinessPhoto {
@@ -71,9 +86,10 @@ export interface AppUser {
   points: number;
   reviewCount: number;
   checkInCount: number;
-  role?: "user" | "admin";
+  role?: "user" | "admin" | "business_owner";
   favorites?: string[];
   checkedDishes?: number[];
+  ownedBusinessIds?: string[];
   lastActive?: any;
   createdAt?: any;
   // Extended profile

@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard } from "lucide-react";
+import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard, Building2 } from "lucide-react";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
@@ -115,6 +115,15 @@ export default function Header() {
                         <LayoutDashboard size={16} /> Admin Panel
                       </Link>
                     )}
+                    {user?.role === "business_owner" && user.ownedBusinessIds && user.ownedBusinessIds.length > 0 && (
+                      <Link
+                        href={`/my-business/${user.ownedBusinessIds[0]}/edit`}
+                        onClick={() => setShowMenu(false)}
+                        className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-primary hover:bg-ls-surface transition-colors"
+                      >
+                        <Building2 size={16} /> My Business
+                      </Link>
+                    )}
                     <Link
                       href="/rewards"
                       onClick={() => setShowMenu(false)}
@@ -192,6 +201,15 @@ export default function Header() {
                 {user?.role === "admin" && (
                   <Link href="/admin" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
                     <LayoutDashboard size={18} /> Admin Panel
+                  </Link>
+                )}
+                {user?.role === "business_owner" && user.ownedBusinessIds && user.ownedBusinessIds.length > 0 && (
+                  <Link
+                    href={`/my-business/${user.ownedBusinessIds[0]}/edit`}
+                    onClick={() => setShowMobileNav(false)}
+                    className="flex items-center gap-sm py-sm text-[15px] text-ls-primary"
+                  >
+                    <Building2 size={18} /> My Business
                   </Link>
                 )}
                 <button

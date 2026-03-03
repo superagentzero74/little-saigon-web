@@ -7,7 +7,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type {
   Business, BusinessPhoto, Review, MonVietDish, BusinessCategory,
-  AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection, DishFeaturedEntry,
+  AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection, DishFeaturedEntry, ClaimRequest,
 } from "./types";
 import { POINTS } from "./types";
 
@@ -542,8 +542,94 @@ export async function getAllReviews(limitCount = 50): Promise<Review[]> {
     });
 }
 
-export async function setUserRole(userId: string, role: "user" | "admin"): Promise<void> {
+export async function setUserRole(userId: string, role: "user" | "admin" | "business_owner"): Promise<void> {
   await updateDoc(doc(db, "users", userId), { role });
+}
+
+// ============================================
+// Business Claim Requests
+// ============================================
+
+export async function getUserClaimForBusiness(businessId: string, userId: string): Promise<ClaimRequest | null> {
+  const q = query(
+    collection(db, "claimRequests"),
+    where("businessId", "==", businessId),
+    where("userId", "==", userId),
+    limit(1)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as ClaimRequest;
+}
+
+export async function submitClaimRequest(businessId: string, businessName: string, note?: string): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Must be logged in");
+
+  const existing = await getUserClaimForBusiness(businessId, user.uid);
+  if (existing) throw new Error("You have already submitted a claim for this business");
+
+  const userProfile = await getUserProfile(user.uid);
+  const data = {
+    businessId,
+    businessName,
+    userId: user.uid,
+    userName: userProfile?.displayName || user.displayName || "Unknown",
+    userEmail: userProfile?.email || user.email || "",
+    status: "pending",
+    note: note || "",
+    createdAt: serverTimestamp(),
+  };
+  const docRef = await addDoc(collection(db, "claimRequests"), data);
+  return docRef.id;
+}
+
+export async function getClaimRequests(status?: "pending" | "approved" | "denied"): Promise<ClaimRequest[]> {
+  const constraints: any[] = [];
+  if (status) constraints.push(where("status", "==", status));
+  constraints.push(orderBy("createdAt", "desc"));
+  const q = query(collection(db, "claimRequests"), ...constraints);
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as ClaimRequest[];
+}
+
+export async function approveClaimRequest(claimId: string): Promise<void> {
+  const claimRef = doc(db, "claimRequests", claimId);
+  const claimSnap = await getDoc(claimRef);
+  if (!claimSnap.exists()) throw new Error("Claim not found");
+
+  const claim = { id: claimSnap.id, ...claimSnap.data() } as ClaimRequest;
+
+  await updateDoc(claimRef, {
+    status: "approved",
+    reviewedAt: serverTimestamp(),
+    reviewedBy: auth.currentUser?.uid || null,
+  });
+
+  await updateDoc(doc(db, "businesses", claim.businessId), {
+    ownerId: claim.userId,
+    claimed: true,
+    updatedAt: serverTimestamp(),
+  });
+
+  await updateDoc(doc(db, "users", claim.userId), {
+    role: "business_owner",
+    ownedBusinessIds: arrayUnion(claim.businessId),
+  });
+}
+
+export async function denyClaimRequest(claimId: string): Promise<void> {
+  await updateDoc(doc(db, "claimRequests", claimId), {
+    status: "denied",
+    reviewedAt: serverTimestamp(),
+    reviewedBy: auth.currentUser?.uid || null,
+  });
+}
+
+export async function getOwnedBusinesses(userId: string): Promise<Business[]> {
+  const q = query(collection(db, "businesses"), where("ownerId", "==", userId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
 }
 
 export async function updateBusiness(businessId: string, data: Partial<Business>): Promise<void> {
