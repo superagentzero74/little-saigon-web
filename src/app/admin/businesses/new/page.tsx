@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, Loader2, CheckCircle, MapPin, Phone, Globe, Star, ChevronDown, ChevronRight } from "lucide-react";
-import { createBusiness } from "@/lib/services";
+import { createBusiness, findDuplicateBusiness } from "@/lib/services";
 import type { BusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 
@@ -60,7 +60,7 @@ export default function AddBusinessPage() {
   const [loadingDetails, setLoadingDetails] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(BLANK);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const [msg, setMsg] = useState<{ text: string; err?: boolean; dupId?: string } | null>(null);
 
   const handleGoogleSearch = async () => {
     if (!googleQuery.trim()) return;
@@ -123,6 +123,12 @@ export default function AddBusinessPage() {
     if (!form.address.trim()) { setMsg({ text: "Address is required", err: true }); return; }
     setSaving(true);
     try {
+      const dup = await findDuplicateBusiness(form.placeId || null, form.name, form.address);
+      if (dup) {
+        setMsg({ text: `"${dup.name}" already exists in the directory.`, err: true, dupId: dup.id });
+        setSaving(false);
+        return;
+      }
       const id = await createBusiness({
         name: form.name.trim(),
         category: form.category,
@@ -360,7 +366,14 @@ export default function AddBusinessPage() {
             <span className="text-[13px] text-green-600 font-medium">✓ {msg.text}</span>
           )}
           {msg?.err && (
-            <span className="text-[13px] text-red-500 font-medium">⚠ {msg.text}</span>
+            <span className="text-[13px] text-red-500 font-medium">
+              ⚠ {msg.text}
+              {msg.dupId && (
+                <Link href="/admin/businesses" className="ml-sm underline hover:no-underline">
+                  View existing listing →
+                </Link>
+              )}
+            </span>
           )}
         </div>
       </div>

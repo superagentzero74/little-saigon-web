@@ -512,6 +512,33 @@ export async function updateBusiness(businessId: string, data: Partial<Business>
   await updateDoc(doc(db, "businesses", businessId), { ...data, updatedAt: serverTimestamp() });
 }
 
+export async function deleteBusiness(businessId: string): Promise<void> {
+  await deleteDoc(doc(db, "businesses", businessId));
+}
+
+/** Returns the existing business if a duplicate is found (by placeId or exact name+address), else null. */
+export async function findDuplicateBusiness(placeId: string | null, name: string, address: string): Promise<Business | null> {
+  // Check by placeId first (most reliable)
+  if (placeId) {
+    const q = query(collection(db, "businesses"), where("placeId", "==", placeId), limit(1));
+    const snap = await getDocs(q);
+    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() } as Business;
+  }
+  // Fallback: exact name match
+  const q2 = query(collection(db, "businesses"), where("name", "==", name.trim()), limit(5));
+  const snap2 = await getDocs(q2);
+  if (!snap2.empty) {
+    // Also check address similarity
+    const lower = address.toLowerCase();
+    const match = snap2.docs.find((d) => {
+      const a: string = d.data().address || "";
+      return a.toLowerCase().includes(lower.slice(0, 20)) || lower.includes(a.slice(0, 20).toLowerCase());
+    });
+    if (match) return { id: match.id, ...match.data() } as Business;
+  }
+  return null;
+}
+
 export async function getAdminStats(): Promise<{ businesses: number; users: number; reviews: number }> {
   const [bizSnap, userSnap, reviewSnap] = await Promise.all([
     getDocs(query(collection(db, "businesses"), limit(500))),

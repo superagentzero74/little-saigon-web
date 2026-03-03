@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Search, Pencil, Check, X, ExternalLink, Plus } from "lucide-react";
-import { getBusinesses, updateBusiness, searchBusinesses } from "@/lib/services";
+import { Search, Pencil, Check, X, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { getBusinesses, updateBusiness, searchBusinesses, deleteBusiness } from "@/lib/services";
 import type { Business, BusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 
@@ -63,6 +63,14 @@ export default function AdminBusinessesPage() {
     const next = !biz.active;
     await updateBusiness(biz.id, { active: next });
     setBusinesses((prev) => prev.map((b) => b.id === biz.id ? { ...b, active: next } : b));
+  };
+
+  const handleDelete = async (biz: Business) => {
+    if (!confirm(`Delete "${biz.name}"? This cannot be undone.`)) return;
+    await deleteBusiness(biz.id);
+    setBusinesses((prev) => prev.filter((b) => b.id !== biz.id));
+    setMsg("Deleted.");
+    setTimeout(() => setMsg(""), 2000);
   };
 
   return (
@@ -226,13 +234,22 @@ export default function AdminBusinessesPage() {
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => startEdit(biz)}
-                            className="p-xs text-ls-secondary hover:text-ls-primary"
-                            title="Edit"
-                          >
-                            <Pencil size={15} />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => startEdit(biz)}
+                              className="p-xs text-ls-secondary hover:text-ls-primary"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(biz)}
+                              className="p-xs text-ls-secondary hover:text-red-500"
+                              title="Delete"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
