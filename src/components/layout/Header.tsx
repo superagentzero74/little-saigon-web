@@ -55,7 +55,7 @@ export default function Header() {
                     {user.displayName}
                   </p>
                   <p className="text-[11px] text-ls-secondary leading-tight">
-                    {user.points} pts
+                    {user.points} Đồng
                   </p>
                 </div>
               </button>
@@ -122,7 +122,7 @@ export default function Header() {
             {user ? (
               <>
                 <Link href="/profile" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
-                  <User size={18} /> Profile · {user.points} pts
+                  <User size={18} /> Profile · {user.points} Đồng
                 </Link>
                 <button
                   onClick={() => { logout(); setShowMobileNav(false); }}

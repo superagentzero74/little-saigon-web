@@ -121,7 +121,7 @@ export default function BusinessDetailPage() {
       setAlreadyReviewed(true);
       setReviewRating(0);
       setReviewText("");
-      setMessage("+25 points earned!");
+      setMessage("+25 Đồng earned!");
       await refreshProfile();
       setTimeout(() => setMessage(""), 3000);
     } catch (err: any) {
@@ -138,7 +138,7 @@ export default function BusinessDetailPage() {
     try {
       const newPhoto = await uploadBusinessPhoto(business.id, e.target.files[0], "other");
       setPhotos([newPhoto, ...photos]);
-      setMessage("+15 points earned!");
+      setMessage("+15 Đồng earned!");
       await refreshProfile();
       setTimeout(() => setMessage(""), 3000);
     } catch (err: any) {
@@ -276,7 +276,7 @@ export default function BusinessDetailPage() {
                 className="ls-btn flex items-center gap-sm disabled:opacity-50"
               >
                 <MapPin size={16} />
-                {checkingIn ? "Checking in..." : "Check In (+10 pts)"}
+                {checkingIn ? "Checking in..." : "Check In (+10 Đồng)"}
               </button>
               <a href={getDirectionsUrl(business)} target="_blank" rel="noopener noreferrer"
                 className="ls-btn-secondary flex items-center gap-sm">
@@ -296,7 +296,7 @@ export default function BusinessDetailPage() {
               {/* Photo Upload */}
               <label className="ls-btn-secondary flex items-center gap-sm cursor-pointer">
                 <Camera size={16} />
-                {uploadingPhoto ? "Uploading..." : "Add Photo (+15 pts)"}
+                {uploadingPhoto ? "Uploading..." : "Add Photo (+15 Đồng)"}
                 <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={uploadingPhoto} />
               </label>
             </div>
@@ -313,7 +313,7 @@ export default function BusinessDetailPage() {
                     onClick={() => user ? setShowReviewForm(true) : router.push("/login")}
                     className="ls-btn text-[13px] py-sm px-lg"
                   >
-                    Write Review (+25 pts)
+                    Write Review (+25 Đồng)
                   </button>
                 )}
               </div>

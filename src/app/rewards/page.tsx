@@ -60,20 +60,20 @@ export default function RewardsPage() {
         <Gift size={36} className="text-ls-primary mx-auto" />
         <h1 className="text-page-title text-ls-primary mt-md">Rewards</h1>
         <p className="text-body text-ls-secondary mt-xs">
-          Earn points by checking in, leaving reviews, and uploading photos.
+          Earn Đồng by checking in, leaving reviews, and uploading photos.
         </p>
         {user && (
           <div className="mt-lg inline-flex items-center gap-sm bg-ls-surface rounded-pill px-xl py-sm">
             <Award size={18} className="text-ls-primary" />
             <span className="text-[18px] font-bold text-ls-primary">{user.points}</span>
-            <span className="text-meta text-ls-secondary">points available</span>
+            <span className="text-meta text-ls-secondary">Đồng available</span>
           </div>
         )}
       </div>
 
       {/* How to Earn */}
       <div className="mb-3xl">
-        <h2 className="text-section-header text-ls-primary mb-lg">How to Earn Points</h2>
+        <h2 className="text-section-header text-ls-primary mb-lg">How to Earn Đồng</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
           {[
             { icon: <Star size={20} />, label: "Write a Review", pts: POINTS.REVIEW },
@@ -88,7 +88,7 @@ export default function RewardsPage() {
               <div className="flex-1">
                 <p className="text-[14px] font-semibold text-ls-primary">{item.label}</p>
               </div>
-              <span className="text-meta font-bold text-ls-primary">+{item.pts} pts</span>
+              <span className="text-meta font-bold text-ls-primary">+{item.pts} Đồng</span>
             </div>
           ))}
         </div>
@@ -112,7 +112,7 @@ export default function RewardsPage() {
           <div className="ls-card text-center py-2xl">
             <Gift size={32} className="text-ls-secondary mx-auto" />
             <p className="text-body text-ls-secondary mt-md">
-              No rewards available right now. Keep earning points!
+              No rewards available right now. Keep earning Đồng!
             </p>
           </div>
         ) : (
@@ -127,7 +127,7 @@ export default function RewardsPage() {
                       <p className="text-body text-ls-body mt-xs">{reward.description}</p>
                     </div>
                     <span className="text-meta font-bold text-ls-primary whitespace-nowrap ml-md">
-                      {reward.pointsCost} pts
+                      {reward.pointsCost} Đồng
                     </span>
                   </div>
                   <button
@@ -139,7 +139,7 @@ export default function RewardsPage() {
                         : "bg-ls-surface text-ls-secondary cursor-not-allowed"
                     }`}
                   >
-                    {redeeming === reward.id ? "Redeeming..." : canAfford ? "Redeem" : "Not enough points"}
+                    {redeeming === reward.id ? "Redeeming..." : canAfford ? "Redeem" : "Not enough Đồng"}
                   </button>
                 </div>
               );

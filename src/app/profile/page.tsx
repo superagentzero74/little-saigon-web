@@ -125,7 +125,7 @@ export default function ProfilePage() {
             <Award size={18} className="text-ls-primary" />
             <span className="text-[22px] font-bold text-ls-primary">{user.points}</span>
           </div>
-          <p className="text-tag text-ls-secondary mt-xs">Points</p>
+          <p className="text-tag text-ls-secondary mt-xs">Đồng</p>
         </div>
         <div className="ls-card text-center">
           <div className="flex items-center justify-center gap-xs">
@@ -195,7 +195,7 @@ export default function ProfilePage() {
                 <div>
                   <p className="text-[14px] font-semibold text-ls-primary">{ci.businessId}</p>
                   <p className="text-tag text-ls-secondary">
-                    +{ci.pointsEarned} pts
+                    +{ci.pointsEarned} Đồng
                   </p>
                 </div>
                 <MapPin size={16} className="text-ls-secondary" />

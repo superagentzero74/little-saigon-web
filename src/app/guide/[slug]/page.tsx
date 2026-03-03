@@ -178,7 +178,7 @@ export default function DishDetailPage() {
     const newState = await toggleDishChecked(user.id, dish.rank);
     setIsChecked(newState);
     if (newState) {
-      setMessage("+5 points earned!");
+      setMessage("+5 Đồng earned!");
       await refreshProfile();
       setTimeout(() => setMessage(""), 3000);
     }

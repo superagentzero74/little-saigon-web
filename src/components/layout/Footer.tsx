@@ -10,7 +10,7 @@ export default function Footer() {
             Xin Chào! Get the Full Experience
           </h2>
           <p className="text-[15px] text-white/70 mt-sm max-w-md mx-auto">
-            Check in, earn points, leave reviews, and discover curated picks.
+            Check in, earn Đồng, leave reviews, and discover curated picks.
             Download the Little Saigon app.
           </p>
           <div className="flex items-center justify-center gap-md mt-lg">
