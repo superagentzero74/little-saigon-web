@@ -42,7 +42,7 @@ export default function Header() {
         {/* Search bar — desktop */}
         <form
           onSubmit={handleSearch}
-          className="hidden md:flex items-center flex-1 max-w-[420px] border border-ls-border rounded-full overflow-hidden bg-white focus-within:border-ls-primary transition-colors"
+          className="hidden md:flex items-center flex-1 max-w-[420px] border border-ls-border rounded-full overflow-hidden bg-gray-100 focus-within:bg-white focus-within:border-ls-primary transition-colors"
         >
           <input
             type="text"
@@ -143,7 +143,7 @@ export default function Header() {
 
       {/* Mobile search bar — always visible below the header row */}
       <div className="md:hidden border-t border-ls-border bg-white px-4 py-2">
-        <form onSubmit={handleSearch} className="flex items-center border border-ls-border rounded-full overflow-hidden focus-within:border-ls-primary transition-colors">
+        <form onSubmit={handleSearch} className="flex items-center border border-ls-border rounded-full overflow-hidden bg-gray-100 focus-within:bg-white focus-within:border-ls-primary transition-colors">
           <input
             type="text"
             value={searchQuery}
