@@ -21,7 +21,7 @@ const CATEGORY_OPTIONS = Object.entries(CATEGORIES) as [BusinessCategory, { labe
 const PHOTO_TAGS: PhotoTag[] = ["outside", "inside", "food", "drinks", "menu", "other"];
 
 const OTHER_TAG_GROUPS: { label: string; tags: string[] }[] = [
-  { label: "Cuisine", tags: ["Vietnamese", "Chinese", "Thai", "Japanese", "Korean", "Fusion"] },
+  { label: "Cuisine", tags: ["Vietnamese"] },
   { label: "Dietary", tags: ["Vegetarian", "Vegan", "Halal", "Gluten-Free"] },
   { label: "Meal", tags: ["Breakfast", "Lunch", "Dinner", "Brunch", "Late Night"] },
   { label: "Service", tags: ["Dine-In", "Takeout", "Delivery", "Drive-Through"] },
