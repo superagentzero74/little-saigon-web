@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X } from "lucide-react";
+import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard } from "lucide-react";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
@@ -106,6 +106,15 @@ export default function Header() {
                     >
                       <User size={16} /> Profile
                     </Link>
+                    {user?.role === "admin" && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setShowMenu(false)}
+                        className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-primary hover:bg-ls-surface transition-colors"
+                      >
+                        <LayoutDashboard size={16} /> Admin Panel
+                      </Link>
+                    )}
                     <Link
                       href="/rewards"
                       onClick={() => setShowMenu(false)}
@@ -180,6 +189,11 @@ export default function Header() {
                 <Link href="/profile" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
                   <User size={18} /> Profile · {user.points} Đồng
                 </Link>
+                {user?.role === "admin" && (
+                  <Link href="/admin" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+                    <LayoutDashboard size={18} /> Admin Panel
+                  </Link>
+                )}
                 <button
                   onClick={() => { logout(); setShowMobileNav(false); }}
                   className="flex items-center gap-sm py-sm text-[15px] text-ls-secondary"
