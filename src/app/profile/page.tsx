@@ -39,7 +39,7 @@ export default function ProfilePage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Profile form
-  const [form, setForm] = useState({ firstName: "", lastName: "", nickname: "", gender: "", city: "", state: "", website: "" });
+  const [form, setForm] = useState({ firstName: "", lastName: "", nickname: "", bio: "", gender: "", city: "", state: "", website: "" });
   const [saving, setSaving] = useState(false);
 
   // Password
@@ -64,6 +64,7 @@ export default function ProfilePage() {
       firstName: user.firstName || parts[0] || "",
       lastName: user.lastName || parts.slice(1).join(" ") || "",
       nickname: user.nickname || "",
+      bio: (user as any).bio || "",
       gender: user.gender || "",
       city: user.city || "",
       state: user.state || "",
@@ -120,14 +121,15 @@ export default function ProfilePage() {
         await updateDisplayName(fullName);
       }
       await updateUserProfile(user.id, {
-        firstName: form.firstName.trim() || undefined,
-        lastName: form.lastName.trim() || undefined,
-        nickname: form.nickname || undefined,
-        gender: (form.gender as any) || undefined,
-        city: form.city || undefined,
-        state: form.state || undefined,
-        website: form.website || undefined,
-      });
+        firstName: form.firstName.trim() || null,
+        lastName: form.lastName.trim() || null,
+        nickname: form.nickname.trim() || null,
+        bio: (form as any).bio.trim() || null,
+        gender: (form.gender as any) || null,
+        city: form.city.trim() || null,
+        state: form.state.trim() || null,
+        website: form.website.trim() || null,
+      } as any);
       await refreshProfile();
       flash("Profile saved!");
     } catch (err: any) {
@@ -226,6 +228,7 @@ export default function ProfilePage() {
 
         <h1 className="text-[22px] font-bold text-ls-primary">{user.displayName}</h1>
         {user.nickname && <p className="text-[13px] text-ls-secondary italic mt-[2px]">"{user.nickname}"</p>}
+        {(user as any).bio && <p className="text-[13px] text-ls-body mt-sm max-w-xs">{(user as any).bio}</p>}
         {(user.city || user.state) && (
           <p className="text-[12px] text-ls-secondary mt-[2px] flex items-center justify-center gap-[3px]">
             <MapPin size={12} /> {[user.city, user.state].filter(Boolean).join(", ")}
@@ -315,6 +318,21 @@ export default function ProfilePage() {
                   />
                 </div>
               ))}
+              {/* Bio — full width */}
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
+                  Bio / About Me
+                </label>
+                <textarea
+                  value={form.bio}
+                  onChange={(e) => setForm((p) => ({ ...p, bio: e.target.value }))}
+                  placeholder="Tell the community a little about yourself…"
+                  rows={3}
+                  maxLength={300}
+                  className="w-full bg-ls-surface rounded-btn px-md py-[10px] text-[14px] text-ls-primary outline-none focus:ring-2 focus:ring-ls-primary/20 placeholder:text-ls-secondary resize-none"
+                />
+                <p className="text-[11px] text-ls-secondary text-right mt-[2px]">{form.bio.length}/300</p>
+              </div>
               <div>
                 <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
                   Gender

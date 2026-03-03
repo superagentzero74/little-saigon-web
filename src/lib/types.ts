@@ -78,6 +78,7 @@ export interface AppUser {
   firstName?: string;
   lastName?: string;
   nickname?: string;
+  bio?: string;
   gender?: "male" | "female" | "other" | "prefer_not" | null;
   city?: string;
   state?: string;
