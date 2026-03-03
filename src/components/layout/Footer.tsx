@@ -1,8 +1,12 @@
 import Link from "next/link";
+import InstagramFeed from "./InstagramFeed";
 
 export default function Footer() {
   return (
     <footer className="border-t border-ls-border mt-3xl">
+      {/* Instagram Feed */}
+      <InstagramFeed />
+
       {/* App CTA */}
       <div className="bg-ls-primary text-white py-3xl">
         <div className="ls-container text-center">
