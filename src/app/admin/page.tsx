@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Store, Users, Star, TrendingUp, ChevronRight, ArrowRight } from "lucide-react";
+import { Store, Users, Star, TrendingUp, ChevronRight, ArrowRight, Pencil } from "lucide-react";
 import { getAdminStats, getAllReviews, getNewlyAddedBusinesses } from "@/lib/services";
 import type { Review, Business } from "@/lib/types";
 
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
         {/* Newly Added Businesses */}
         <div className="bg-white rounded-card border border-ls-border">
           <div className="flex items-center justify-between px-lg py-md border-b border-ls-border">
-            <h2 className="text-[14px] font-semibold text-ls-primary">Recently Updated Businesses</h2>
+            <h2 className="text-[14px] font-semibold text-ls-primary">Recently Updated</h2>
             <Link href="/admin/businesses" className="flex items-center gap-xs text-[12px] text-ls-secondary hover:text-ls-primary">
               View all <ChevronRight size={14} />
             </Link>
@@ -117,6 +117,13 @@ export default function AdminDashboard() {
                   <p className="text-[11px] text-ls-secondary capitalize">{b.category}</p>
                 </div>
                 <span className="shrink-0 text-[11px] text-ls-secondary">{fmtDate(b.updatedAt)}</span>
+                <Link
+                  href={`/admin/businesses/${b.id}/edit`}
+                  className="shrink-0 p-xs text-ls-secondary hover:text-ls-primary"
+                  title="Edit"
+                >
+                  <Pencil size={14} />
+                </Link>
               </div>
             ))}
           </div>
