@@ -99,7 +99,7 @@ export default function AdminDashboard() {
         {/* Newly Added Businesses */}
         <div className="bg-white rounded-card border border-ls-border">
           <div className="flex items-center justify-between px-lg py-md border-b border-ls-border">
-            <h2 className="text-[14px] font-semibold text-ls-primary">Newly Added Businesses</h2>
+            <h2 className="text-[14px] font-semibold text-ls-primary">Recently Updated Businesses</h2>
             <Link href="/admin/businesses" className="flex items-center gap-xs text-[12px] text-ls-secondary hover:text-ls-primary">
               View all <ChevronRight size={14} />
             </Link>
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
                   <p className="text-[13px] font-semibold text-ls-primary truncate">{b.name}</p>
                   <p className="text-[11px] text-ls-secondary capitalize">{b.category}</p>
                 </div>
-                <span className="shrink-0 text-[11px] text-ls-secondary">{fmtDate(b.createdAt)}</span>
+                <span className="shrink-0 text-[11px] text-ls-secondary">{fmtDate(b.updatedAt)}</span>
               </div>
             ))}
           </div>

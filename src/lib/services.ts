@@ -568,7 +568,7 @@ export async function findDuplicateBusiness(placeId: string | null, name: string
 }
 
 export async function getNewlyAddedBusinesses(limitCount = 5): Promise<Business[]> {
-  const q = query(collection(db, "businesses"), orderBy("createdAt", "desc"), limit(limitCount));
+  const q = query(collection(db, "businesses"), orderBy("updatedAt", "desc"), limit(limitCount));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
 }
