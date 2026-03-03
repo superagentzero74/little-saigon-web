@@ -141,30 +141,29 @@ export default function Header() {
         </button>
       </div>
 
+      {/* Mobile search bar — always visible below the header row */}
+      <div className="md:hidden border-t border-ls-border bg-white px-4 py-2">
+        <form onSubmit={handleSearch} className="flex items-center border border-ls-border rounded-full overflow-hidden focus-within:border-ls-primary transition-colors">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search restaurants, dishes…"
+            className="flex-1 min-w-0 px-lg py-[7px] text-[14px] text-ls-primary placeholder:text-ls-secondary outline-none bg-transparent"
+          />
+          <button
+            type="submit"
+            className="shrink-0 h-[36px] w-[42px] flex items-center justify-center bg-ls-primary hover:bg-ls-primary/90 transition-colors"
+            aria-label="Search"
+          >
+            <Search size={17} className="text-white" />
+          </button>
+        </form>
+      </div>
+
       {/* Mobile Nav Drawer */}
       {showMobileNav && (
         <div className="md:hidden border-t border-ls-border bg-white pb-lg">
-          {/* Mobile search bar */}
-          <div className="px-4 pt-3 pb-1">
-            <form onSubmit={handleSearch} className="flex items-center border border-ls-border rounded-full overflow-hidden focus-within:border-ls-primary transition-colors">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search restaurants, dishes…"
-                autoFocus
-                className="flex-1 min-w-0 px-lg py-[8px] text-[14px] text-ls-primary placeholder:text-ls-secondary outline-none bg-transparent"
-              />
-              <button
-                type="submit"
-                className="shrink-0 h-[38px] w-[44px] flex items-center justify-center bg-ls-primary hover:bg-ls-primary/90 transition-colors"
-                aria-label="Search"
-              >
-                <Search size={17} className="text-white" />
-              </button>
-            </form>
-          </div>
-
           <nav className="ls-container flex flex-col gap-sm pt-md">
             <Link href="/explore" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
               <Compass size={18} /> Explore

@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, ArrowRight, MapPin, ChevronRight } from "lucide-react";
+import { ArrowRight, MapPin, ChevronRight } from "lucide-react";
 import type { Business, MonVietDish, BusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
-import { getTopRatedBusinesses, getDishes, searchBusinesses } from "@/lib/services";
+import { getTopRatedBusinesses, getDishes } from "@/lib/services";
 import BusinessFeaturedCard from "@/components/business/BusinessFeaturedCard";
 import DishCard from "@/components/guide/DishCard";
 
@@ -19,7 +19,6 @@ const HERO_IMAGES = [
 export default function HomePage() {
   const [topRated, setTopRated] = useState<Business[]>([]);
   const [dishes, setDishes] = useState<MonVietDish[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [heroIndex, setHeroIndex] = useState(0);
 
@@ -47,13 +46,6 @@ export default function HomePage() {
     }
     load();
   }, []);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      window.location.href = `/explore?q=${encodeURIComponent(searchQuery.trim())}`;
-    }
-  };
 
   const categories = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
 
@@ -89,7 +81,7 @@ export default function HomePage() {
         </div>
 
         {/* Content */}
-        <div className="relative ls-container py-[64px] md:py-[96px]">
+        <div className="relative ls-container py-[48px] md:py-[80px]">
           <p className="text-meta text-white/70 uppercase tracking-widest mb-sm">
             Westminster · Garden Grove · Fountain Valley
           </p>
@@ -99,28 +91,6 @@ export default function HomePage() {
           <p className="text-[18px] text-white/80 mt-sm max-w-lg">
             Discover the best Vietnamese restaurants, businesses, and services in Little Saigon, Southern California.
           </p>
-
-          {/* Search */}
-          <form onSubmit={handleSearch} className="mt-2xl max-w-xl">
-            <div className="flex items-center bg-white rounded-btn overflow-hidden">
-              <div className="pl-lg">
-                <Search size={20} className="text-ls-secondary" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search businesses, dishes, or neighborhoods..."
-                className="flex-1 px-md py-[14px] text-[15px] text-ls-primary bg-transparent outline-none placeholder:text-ls-secondary"
-              />
-              <button
-                type="submit"
-                className="bg-ls-primary text-white px-xl py-[14px] text-[14px] font-semibold hover:bg-black transition-colors"
-              >
-                Search
-              </button>
-            </div>
-          </form>
         </div>
       </section>
 
