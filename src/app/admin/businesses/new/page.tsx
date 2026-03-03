@@ -127,19 +127,19 @@ export default function AddBusinessPage() {
         name: form.name.trim(),
         category: form.category,
         address: form.address.trim(),
-        phone: form.phone.trim() || undefined,
-        website: form.website.trim() || undefined,
-        description: form.description.trim() || undefined,
+        phone: form.phone.trim() || null,
+        website: form.website.trim() || null,
+        description: form.description.trim() || null,
         rating: form.rating ? parseFloat(form.rating) : 0,
         totalRatings: form.totalRatings ? parseInt(form.totalRatings) : 0,
-        priceLevel: form.priceLevel ? parseInt(form.priceLevel) : undefined,
+        priceLevel: form.priceLevel ? parseInt(form.priceLevel) : null,
         latitude: form.latitude ? parseFloat(form.latitude) : 0,
         longitude: form.longitude ? parseFloat(form.longitude) : 0,
-        placeId: form.placeId || undefined,
-        hours: form.hours ? form.hours.split("\n").filter(Boolean) : undefined,
+        placeId: form.placeId || null,
+        hours: form.hours ? form.hours.split("\n").filter(Boolean) : [],
         photos: [],
         active: form.active,
-      });
+      } as any);
       router.push("/admin/businesses");
     } catch (err: any) {
       setMsg({ text: err.message || "Failed to save", err: true });
