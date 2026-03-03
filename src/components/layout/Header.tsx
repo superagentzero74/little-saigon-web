@@ -3,30 +3,65 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X } from "lucide-react";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
+  const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (q) {
+      router.push(`/explore?q=${encodeURIComponent(q)}`);
+    } else {
+      router.push("/explore");
+    }
+    setShowMobileNav(false);
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-ls-border">
-      <div className="ls-container flex items-center justify-between h-[56px]">
+      <div className="ls-container flex items-center gap-md h-[56px]">
         {/* Logo */}
-        <Link href="/">
+        <Link href="/" className="shrink-0">
           <Image
             src="/lso-logo.png"
             alt="Little Saigon Official"
             width={160}
             height={40}
-            className="h-[48px] w-auto"
+            className="h-[40px] w-auto"
           />
         </Link>
 
+        {/* Search bar — desktop */}
+        <form
+          onSubmit={handleSearch}
+          className="hidden md:flex items-center flex-1 max-w-[420px] border border-ls-border rounded-full overflow-hidden bg-white focus-within:border-ls-primary transition-colors"
+        >
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search restaurants, dishes…"
+            className="flex-1 min-w-0 px-lg py-[7px] text-[14px] text-ls-primary placeholder:text-ls-secondary outline-none bg-transparent"
+          />
+          <button
+            type="submit"
+            className="shrink-0 h-[36px] w-[42px] flex items-center justify-center bg-ls-primary hover:bg-ls-primary/90 transition-colors"
+            aria-label="Search"
+          >
+            <Search size={17} className="text-white" />
+          </button>
+        </form>
+
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-xl">
+        <nav className="hidden md:flex items-center gap-xl ml-auto">
           <Link href="/explore" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
             <Compass size={16} /> Explore
           </Link>
@@ -96,10 +131,11 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Mobile Hamburger */}
+        {/* Mobile: hamburger */}
         <button
-          className="md:hidden p-sm"
+          className="md:hidden p-sm ml-auto"
           onClick={() => setShowMobileNav(!showMobileNav)}
+          aria-label="Menu"
         >
           {showMobileNav ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -108,6 +144,27 @@ export default function Header() {
       {/* Mobile Nav Drawer */}
       {showMobileNav && (
         <div className="md:hidden border-t border-ls-border bg-white pb-lg">
+          {/* Mobile search bar */}
+          <div className="px-4 pt-3 pb-1">
+            <form onSubmit={handleSearch} className="flex items-center border border-ls-border rounded-full overflow-hidden focus-within:border-ls-primary transition-colors">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search restaurants, dishes…"
+                autoFocus
+                className="flex-1 min-w-0 px-lg py-[8px] text-[14px] text-ls-primary placeholder:text-ls-secondary outline-none bg-transparent"
+              />
+              <button
+                type="submit"
+                className="shrink-0 h-[38px] w-[44px] flex items-center justify-center bg-ls-primary hover:bg-ls-primary/90 transition-colors"
+                aria-label="Search"
+              >
+                <Search size={17} className="text-white" />
+              </button>
+            </form>
+          </div>
+
           <nav className="ls-container flex flex-col gap-sm pt-md">
             <Link href="/explore" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
               <Compass size={18} /> Explore
