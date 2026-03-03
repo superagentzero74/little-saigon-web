@@ -3,24 +3,24 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Store, Users, Star, TrendingUp, ChevronRight, ArrowRight } from "lucide-react";
-import { getAdminStats, getAllReviews, getTopRatedBusinesses } from "@/lib/services";
+import { getAdminStats, getAllReviews, getNewlyAddedBusinesses } from "@/lib/services";
 import type { Review, Business } from "@/lib/types";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<{ businesses: number; users: number; reviews: number } | null>(null);
   const [recentReviews, setRecentReviews] = useState<Review[]>([]);
-  const [topBiz, setTopBiz] = useState<Business[]>([]);
+  const [newBiz, setNewBiz] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       getAdminStats(),
       getAllReviews(5),
-      getTopRatedBusinesses(5),
+      getNewlyAddedBusinesses(5),
     ]).then(([s, r, b]) => {
       setStats(s);
       setRecentReviews(r);
-      setTopBiz(b);
+      setNewBiz(b);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -34,7 +34,7 @@ export default function AdminDashboard() {
     { label: "Businesses", value: stats?.businesses, icon: Store, href: "/admin/businesses", color: "bg-blue-500" },
     { label: "Users", value: stats?.users, icon: Users, href: "/admin/users", color: "bg-violet-500" },
     { label: "Reviews", value: stats?.reviews, icon: Star, href: "/admin/reviews", color: "bg-amber-500" },
-    { label: "Rating Avg", value: topBiz.length ? (topBiz.reduce((s, b) => s + b.rating, 0) / topBiz.length).toFixed(1) : "—", icon: TrendingUp, href: "/admin/businesses", color: "bg-green-500" },
+    { label: "Rating Avg", value: newBiz.length ? (newBiz.reduce((s, b) => s + b.rating, 0) / newBiz.length).toFixed(1) : "—", icon: TrendingUp, href: "/admin/businesses", color: "bg-green-500" },
   ];
 
   return (
@@ -96,10 +96,10 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Top Rated Businesses */}
+        {/* Newly Added Businesses */}
         <div className="bg-white rounded-card border border-ls-border">
           <div className="flex items-center justify-between px-lg py-md border-b border-ls-border">
-            <h2 className="text-[14px] font-semibold text-ls-primary">Top Rated Businesses</h2>
+            <h2 className="text-[14px] font-semibold text-ls-primary">Newly Added Businesses</h2>
             <Link href="/admin/businesses" className="flex items-center gap-xs text-[12px] text-ls-secondary hover:text-ls-primary">
               View all <ChevronRight size={14} />
             </Link>
@@ -110,14 +110,13 @@ export default function AdminDashboard() {
                 <div className="h-4 bg-ls-surface rounded w-2/3 mb-xs" />
                 <div className="h-3 bg-ls-surface rounded w-1/3" />
               </div>
-            )) : topBiz.map((b, i) => (
+            )) : newBiz.map((b) => (
               <div key={b.id} className="px-lg py-md flex items-center gap-md">
-                <span className="text-[13px] font-bold text-ls-secondary w-[20px] shrink-0">{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold text-ls-primary truncate">{b.name}</p>
                   <p className="text-[11px] text-ls-secondary capitalize">{b.category}</p>
                 </div>
-                <span className="shrink-0 text-[12px] font-semibold text-amber-500">★ {b.rating.toFixed(1)}</span>
+                <span className="shrink-0 text-[11px] text-ls-secondary">{fmtDate(b.createdAt)}</span>
               </div>
             ))}
           </div>
