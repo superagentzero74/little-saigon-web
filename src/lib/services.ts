@@ -470,3 +470,46 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+// ============================================
+// Admin
+// ============================================
+
+export async function getAllUsers(limitCount = 50): Promise<AppUser[]> {
+  const q = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(limitCount));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as AppUser[];
+}
+
+export async function getAllReviews(limitCount = 50): Promise<Review[]> {
+  const q = query(collection(db, "reviews"), limit(limitCount));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Review)
+    .sort((a, b) => {
+      const aMs = a.createdAt?.toMillis?.() ?? (a.createdAt?.seconds ?? 0) * 1000;
+      const bMs = b.createdAt?.toMillis?.() ?? (b.createdAt?.seconds ?? 0) * 1000;
+      return bMs - aMs;
+    });
+}
+
+export async function setUserRole(userId: string, role: "user" | "admin"): Promise<void> {
+  await updateDoc(doc(db, "users", userId), { role });
+}
+
+export async function updateBusiness(businessId: string, data: Partial<Business>): Promise<void> {
+  await updateDoc(doc(db, "businesses", businessId), { ...data, updatedAt: serverTimestamp() });
+}
+
+export async function getAdminStats(): Promise<{ businesses: number; users: number; reviews: number }> {
+  const [bizSnap, userSnap, reviewSnap] = await Promise.all([
+    getDocs(query(collection(db, "businesses"), limit(500))),
+    getDocs(query(collection(db, "users"), limit(500))),
+    getDocs(query(collection(db, "reviews"), limit(500))),
+  ]);
+  return {
+    businesses: bizSnap.size,
+    users: userSnap.size,
+    reviews: reviewSnap.size,
+  };
+}
