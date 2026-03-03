@@ -9,34 +9,22 @@ import {
 } from "lucide-react";
 import {
   getBusinessById, updateBusiness, getBusinessPhotos,
-  deleteBusinessPhoto, reorderBusinessPhotos, updateBusinessPhoto,
+  deleteBusinessPhoto, reorderBusinessPhotos, updateBusinessPhoto, getDishes,
 } from "@/lib/services";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import type { Business, BusinessCategory, BusinessPhoto, PhotoTag } from "@/lib/types";
+import type { BusinessCategory, BusinessPhoto, PhotoTag, MonVietDish } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 
 const CATEGORY_OPTIONS = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
 
 const PHOTO_TAGS: PhotoTag[] = ["outside", "inside", "food", "drinks", "menu", "other"];
 
-const FOOD_TAGS = [
-  // Cuisine
-  "Vietnamese", "Chinese", "Thai", "Japanese", "Korean", "Fusion",
-  // Dishes
-  "Phở", "Bánh Mì", "Bún Bò Huế", "Cơm Tấm", "Hủ Tiếu", "Cháo", "Lẩu",
-  "BBQ / Nướng", "Dim Sum", "Sushi", "Ramen",
-  // Food type
-  "Seafood", "Noodles", "Rice Dishes", "Sandwiches", "Soup", "Salads",
-  "Desserts", "Bánh Ngọt", "Chè", "Ice Cream",
-  // Drinks
-  "Bubble Tea", "Coffee / Cà Phê", "Smoothies", "Juice", "Boba",
-  // Dietary
-  "Vegetarian", "Vegan", "Halal", "Gluten-Free",
-  // Meal
-  "Breakfast", "Lunch", "Dinner", "Late Night", "Brunch",
-  // Service
-  "Dine-In", "Takeout", "Delivery", "Drive-Through",
+const OTHER_TAG_GROUPS: { label: string; tags: string[] }[] = [
+  { label: "Cuisine", tags: ["Vietnamese", "Chinese", "Thai", "Japanese", "Korean", "Fusion"] },
+  { label: "Dietary", tags: ["Vegetarian", "Vegan", "Halal", "Gluten-Free"] },
+  { label: "Meal", tags: ["Breakfast", "Lunch", "Dinner", "Brunch", "Late Night"] },
+  { label: "Service", tags: ["Dine-In", "Takeout", "Delivery", "Drive-Through"] },
 ];
 
 interface FormState {
@@ -65,16 +53,19 @@ export default function EditBusinessPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState | null>(null);
   const [photos, setPhotos] = useState<BusinessPhoto[]>([]);
+  const [dishes, setDishes] = useState<MonVietDish[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean } | null>(null);
   const [customTag, setCustomTag] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [biz, pics] = await Promise.all([
+    const [biz, pics, allDishes] = await Promise.all([
       getBusinessById(businessId),
       getBusinessPhotos(businessId),
+      getDishes(),
     ]);
+    setDishes(allDishes);
     if (!biz) { router.push("/admin/businesses"); return; }
     setForm({
       name: biz.name || "",
@@ -359,18 +350,65 @@ export default function EditBusinessPage() {
           </div>
         )}
 
-        {/* Predefined tag chips */}
-        <div className="flex flex-wrap gap-xs mb-md">
-          {FOOD_TAGS.filter((t) => !form.tags.includes(t)).map((tag) => (
-            <button
-              key={tag}
-              onClick={() => toggleTag(tag)}
-              className="text-[12px] px-sm py-[3px] rounded-full border border-ls-border bg-ls-surface hover:border-ls-primary hover:text-ls-primary transition-colors"
-            >
-              + {tag}
-            </button>
-          ))}
-        </div>
+        {/* Món Việt Guide dishes — grouped by section */}
+        {dishes.length > 0 && (() => {
+          const sections: { label: string; items: MonVietDish[] }[] = [
+            { label: "Noodle Soups", items: dishes.filter((d) => d.rank <= 10) },
+            { label: "Dry Noodles & Rice", items: dishes.filter((d) => d.rank >= 11 && d.rank <= 20) },
+            { label: "Bánh & Rolls", items: dishes.filter((d) => d.rank >= 21 && d.rank <= 34) },
+            { label: "Grilled & Mains", items: dishes.filter((d) => d.rank >= 35 && d.rank <= 42) },
+            { label: "Sides & Sweets", items: dishes.filter((d) => d.rank >= 43) },
+          ];
+          return sections.map(({ label, items }) => (
+            <div key={label} className="mb-md">
+              <p className="text-[10px] font-bold text-ls-secondary uppercase tracking-widest mb-xs">{label}</p>
+              <div className="flex flex-wrap gap-xs">
+                {items.map((dish) => {
+                  const selected = form.tags.includes(dish.name);
+                  return (
+                    <button
+                      key={dish.rank}
+                      onClick={() => toggleTag(dish.name)}
+                      className={`text-[12px] px-sm py-[3px] rounded-full border transition-colors ${
+                        selected
+                          ? "bg-ls-primary text-white border-ls-primary"
+                          : "border-ls-border bg-ls-surface hover:border-ls-primary hover:text-ls-primary"
+                      }`}
+                    >
+                      {selected ? "" : "+ "}{dish.name}
+                      <span className="ml-[3px] text-[10px] opacity-60">{dish.englishName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ));
+        })()}
+
+        {/* Other tag groups */}
+        {OTHER_TAG_GROUPS.map(({ label, tags }) => (
+          <div key={label} className="mb-md">
+            <p className="text-[10px] font-bold text-ls-secondary uppercase tracking-widest mb-xs">{label}</p>
+            <div className="flex flex-wrap gap-xs">
+              {tags.map((tag) => {
+                const selected = form.tags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={`text-[12px] px-sm py-[3px] rounded-full border transition-colors ${
+                      selected
+                        ? "bg-ls-primary text-white border-ls-primary"
+                        : "border-ls-border bg-ls-surface hover:border-ls-primary hover:text-ls-primary"
+                    }`}
+                  >
+                    {selected ? "" : "+ "}{tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
 
         {/* Custom tag input */}
         <div className="flex gap-sm">
