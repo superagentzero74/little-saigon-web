@@ -142,6 +142,14 @@ export async function updateReview(reviewId: string, rating: number, text: strin
   await updateDoc(doc(db, "reviews", reviewId), { rating, text, updatedAt: serverTimestamp() });
 }
 
+/**
+ * Returns the deterministic review doc ID for a user+business pair.
+ * Used by submitReview and the detail page to locate existing reviews.
+ */
+export function reviewDocId(businessId: string, userId: string): string {
+  return `${businessId}_${userId}`;
+}
+
 export async function submitReview(
   businessId: string,
   rating: number,
@@ -163,13 +171,19 @@ export async function submitReview(
     updatedAt: serverTimestamp(),
   };
 
-  const docRef = await addDoc(collection(db, "reviews"), reviewData);
+  // Deterministic ID prevents duplicate reviews from the same user
+  const reviewDocId = `${businessId}_${user.uid}`;
+  const isNew = !(await getDoc(doc(db, "reviews", reviewDocId))).exists();
 
-  // Award points + increment review count
-  await awardPoints(user.uid, POINTS.REVIEW, "review", businessId);
-  await updateDoc(doc(db, "users", user.uid), { reviewCount: increment(1) });
+  await setDoc(doc(db, "reviews", reviewDocId), reviewData);
 
-  return { id: docRef.id, ...reviewData } as Review;
+  // Only award points and increment count on first review
+  if (isNew) {
+    await awardPoints(user.uid, POINTS.REVIEW, "review", businessId);
+    await updateDoc(doc(db, "users", user.uid), { reviewCount: increment(1) });
+  }
+
+  return { id: reviewDocId, ...reviewData } as Review;
 }
 
 export async function deleteReview(reviewId: string): Promise<void> {
