@@ -7,7 +7,7 @@ import { Search, Loader2, CheckCircle, MapPin, Phone, Globe, Star, ChevronRight,
 import { createBusiness, findDuplicateBusiness } from "@/lib/services";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import type { BusinessCategory } from "@/lib/types";
+import type { BusinessCategory, PhotoTag } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 
 const CATEGORY_OPTIONS = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
@@ -61,7 +61,7 @@ export default function AddBusinessPage() {
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loadingDetails, setLoadingDetails] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(BLANK);
-  const [fetchedPhotos, setFetchedPhotos] = useState<string[]>([]);
+  const [fetchedPhotos, setFetchedPhotos] = useState<{ url: string; tag: PhotoTag }[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean; dupId?: string } | null>(null);
@@ -113,11 +113,11 @@ export default function AddBusinessPage() {
       setMsg({ text: `Loaded "${r.name}" from Google Places` });
       setTimeout(() => setMsg(null), 3000);
 
-      // Fetch up to 5 photo URLs in parallel
+      // Fetch up to 5 photo URLs in parallel, then auto-classify
       const photoRefs: string[] = (r.photos || []).slice(0, 5).map((p: any) => p.photo_reference).filter(Boolean);
       if (photoRefs.length > 0) {
         setLoadingPhotos(true);
-        const urls = await Promise.all(
+        const urls = (await Promise.all(
           photoRefs.map(async (ref) => {
             try {
               const res = await fetch(`/api/places/photo?ref=${encodeURIComponent(ref)}&maxwidth=800`);
@@ -127,8 +127,21 @@ export default function AddBusinessPage() {
               return null;
             }
           })
-        );
-        setFetchedPhotos(urls.filter(Boolean) as string[]);
+        )).filter(Boolean) as string[];
+
+        // Auto-classify each photo using Vision API
+        let tags: PhotoTag[] = urls.map(() => "other" as PhotoTag);
+        try {
+          const classRes = await fetch("/api/photos/classify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ urls }),
+          });
+          const classData = await classRes.json();
+          if (classData.tags?.length) tags = classData.tags;
+        } catch { /* use default tags */ }
+
+        setFetchedPhotos(urls.map((url, i) => ({ url, tag: tags[i] ?? "other" })));
         setLoadingPhotos(false);
       } else {
         setFetchedPhotos([]);
@@ -172,15 +185,15 @@ export default function AddBusinessPage() {
         active: form.active,
       } as any);
 
-      // Save fetched photos to the subcollection
+      // Save fetched photos to the subcollection with auto-classified tags
       if (fetchedPhotos.length > 0) {
-        const tags = ["outside", "inside", "food", "food", "other"] as const;
         await Promise.all(
-          fetchedPhotos.map((url, i) =>
+          fetchedPhotos.map((photo, i) =>
             addDoc(collection(db, "businesses", id, "photos"), {
               businessId: id,
-              url,
-              tag: tags[i] ?? "other",
+              url: photo.url,
+              tag: photo.tag,
+              order: i,
               createdAt: serverTimestamp(),
             })
           )
@@ -289,10 +302,10 @@ export default function AddBusinessPage() {
           ) : (
             <>
               <div className="flex flex-wrap gap-sm">
-                {fetchedPhotos.map((url, i) => (
-                  <div key={i} className="relative group">
+                {fetchedPhotos.map((photo, i) => (
+                  <div key={i} className="relative group w-[120px]">
                     <img
-                      src={url}
+                      src={photo.url}
                       alt={`Photo ${i + 1}`}
                       className="w-[120px] h-[90px] object-cover rounded-btn border border-ls-border"
                     />
@@ -303,11 +316,20 @@ export default function AddBusinessPage() {
                     >
                       <X size={11} />
                     </button>
+                    <select
+                      value={photo.tag}
+                      onChange={(e) => setFetchedPhotos((prev) => prev.map((p, j) => j === i ? { ...p, tag: e.target.value as PhotoTag } : p))}
+                      className="w-full mt-[3px] text-[11px] border border-ls-border rounded px-xs py-[2px] bg-white outline-none focus:border-ls-primary capitalize"
+                    >
+                      {(["food","drinks","inside","menu","outside","other"] as PhotoTag[]).map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
                   </div>
                 ))}
               </div>
               <p className="text-[11px] text-ls-secondary mt-sm">
-                {fetchedPhotos.length} photo{fetchedPhotos.length !== 1 ? "s" : ""} will be saved. Hover to remove any you don't want.
+                {fetchedPhotos.length} photo{fetchedPhotos.length !== 1 ? "s" : ""} auto-tagged by AI. Adjust any tag before saving.
               </p>
             </>
           )}
