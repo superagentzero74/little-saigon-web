@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Search, Pencil, Check, X, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { Search, Pencil, Check, X, ExternalLink, Plus, Trash2, Settings2 } from "lucide-react";
 import { getBusinesses, updateBusiness, searchBusinesses, deleteBusiness } from "@/lib/services";
 import type { Business, BusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
@@ -238,10 +238,17 @@ export default function AdminBusinessesPage() {
                             <button
                               onClick={() => startEdit(biz)}
                               className="p-xs text-ls-secondary hover:text-ls-primary"
-                              title="Edit"
+                              title="Quick edit"
                             >
                               <Pencil size={15} />
                             </button>
+                            <Link
+                              href={`/admin/businesses/${biz.id}/edit`}
+                              className="p-xs text-ls-secondary hover:text-ls-primary"
+                              title="Full edit"
+                            >
+                              <Settings2 size={15} />
+                            </Link>
                             <button
                               onClick={() => handleDelete(biz)}
                               className="p-xs text-ls-secondary hover:text-red-500"

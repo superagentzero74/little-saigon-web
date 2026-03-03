@@ -80,9 +80,33 @@ export async function searchBusinesses(searchQuery: string): Promise<Business[]>
 // ============================================
 
 export async function getBusinessPhotos(businessId: string): Promise<BusinessPhoto[]> {
-  const q = query(collection(db, "businesses", businessId, "photos"), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as BusinessPhoto[];
+  const snap = await getDocs(collection(db, "businesses", businessId, "photos"));
+  const photos = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as BusinessPhoto[];
+  // Sort by order field if present, otherwise by createdAt
+  return photos.sort((a, b) => {
+    if (a.order != null && b.order != null) return a.order - b.order;
+    if (a.order != null) return -1;
+    if (b.order != null) return 1;
+    const aMs = a.createdAt?.toMillis?.() ?? (a.createdAt?.seconds ?? 0) * 1000;
+    const bMs = b.createdAt?.toMillis?.() ?? (b.createdAt?.seconds ?? 0) * 1000;
+    return aMs - bMs;
+  });
+}
+
+export async function deleteBusinessPhoto(businessId: string, photoId: string): Promise<void> {
+  await deleteDoc(doc(db, "businesses", businessId, "photos", photoId));
+}
+
+export async function reorderBusinessPhotos(businessId: string, orderedIds: string[]): Promise<void> {
+  await Promise.all(
+    orderedIds.map((id, i) =>
+      updateDoc(doc(db, "businesses", businessId, "photos", id), { order: i })
+    )
+  );
+}
+
+export async function updateBusinessPhoto(businessId: string, photoId: string, data: Partial<BusinessPhoto>): Promise<void> {
+  await updateDoc(doc(db, "businesses", businessId, "photos", photoId), data as any);
 }
 
 export async function uploadBusinessPhoto(

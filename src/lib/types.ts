@@ -33,6 +33,7 @@ export interface Business {
   latitude: number;
   longitude: number;
   placeId?: string;
+  tags?: string[];
   createdAt?: any;
   updatedAt?: any;
 }
@@ -43,6 +44,7 @@ export interface BusinessPhoto {
   userId?: string;
   url: string;
   tag: PhotoTag;
+  order?: number;
   createdAt?: any;
 }
 
