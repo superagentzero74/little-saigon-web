@@ -447,6 +447,16 @@ function mapFoodDoc(docId: string, data: any): MonVietDish {
   };
 }
 
+export async function updateDishHeroImage(dishDocId: string, rank: number, file: File): Promise<string> {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `foods/${rank}/hero.${ext}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  await updateDoc(doc(db, "foods", dishDocId), { imageURL: url });
+  return url;
+}
+
 export async function getDishes(): Promise<MonVietDish[]> {
   const snap = await getDocs(collection(db, "foods"));
   return snap.docs

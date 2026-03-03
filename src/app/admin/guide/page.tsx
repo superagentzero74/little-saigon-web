@@ -3,13 +3,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Trophy, X, Search, Save, ArrowUp, ArrowDown } from "lucide-react";
+import { Trophy, X, Search, Save, ArrowUp, ArrowDown, ImageIcon, Upload, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getDishes,
   searchBusinesses,
   getDishFeatured,
   setDishFeatured,
+  updateDishHeroImage,
 } from "@/lib/services";
 import type { MonVietDish, Business } from "@/lib/types";
 
@@ -32,6 +33,9 @@ export default function GuideAdminPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [dishFilter, setDishFilter] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageMsg, setImageMsg] = useState("");
+  const [heroPreview, setHeroPreview] = useState<string | null>(null);
 
   // Guard: admin only
   useEffect(() => {
@@ -147,7 +151,7 @@ export default function GuideAdminPage() {
             {filteredDishes.map((d) => (
               <button
                 key={d.rank}
-                onClick={() => { setSelectedDish(d); setSearchQuery(""); setSearchResults([]); setSaveMsg(""); }}
+                onClick={() => { setSelectedDish(d); setSearchQuery(""); setSearchResults([]); setSaveMsg(""); setHeroPreview(d.photoURL || null); setImageMsg(""); }}
                 className={`w-full text-left px-md py-sm flex items-center gap-sm transition-colors ${
                   selectedDish?.rank === d.rank
                     ? "bg-ls-primary text-white"
@@ -179,6 +183,60 @@ export default function GuideAdminPage() {
                   #{selectedDish.rank} {selectedDish.name}
                 </h2>
                 <p className="text-meta text-ls-secondary">{selectedDish.englishName}</p>
+              </div>
+
+              {/* Hero Image Upload */}
+              <div className="mb-xl pb-xl border-b border-ls-border">
+                <h3 className="text-[14px] font-semibold text-ls-primary flex items-center gap-sm mb-md">
+                  <ImageIcon size={14} /> Hero Image
+                </h3>
+                <div className="flex items-start gap-lg">
+                  {/* Preview */}
+                  <div className="w-[120px] h-[90px] rounded-btn border border-ls-border overflow-hidden bg-ls-surface flex items-center justify-center shrink-0">
+                    {heroPreview ? (
+                      <img src={heroPreview} alt="Hero" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={24} className="text-ls-border" />
+                    )}
+                  </div>
+                  {/* Upload controls */}
+                  <div className="flex-1">
+                    <label className="ls-btn flex items-center gap-sm text-[13px] cursor-pointer w-fit">
+                      {uploadingImage ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                      {uploadingImage ? "Uploading…" : "Upload Image"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingImage}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !selectedDish) return;
+                          setUploadingImage(true);
+                          setImageMsg("");
+                          try {
+                            const url = await updateDishHeroImage(selectedDish.id, selectedDish.rank, file);
+                            setHeroPreview(url);
+                            setDishes((prev) => prev.map((d) => d.id === selectedDish.id ? { ...d, photoURL: url } : d));
+                            setImageMsg("Image saved!");
+                            setTimeout(() => setImageMsg(""), 3000);
+                          } catch {
+                            setImageMsg("Upload failed.");
+                          } finally {
+                            setUploadingImage(false);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                    </label>
+                    <p className="text-[11px] text-ls-secondary mt-xs">JPG, PNG or WebP. Recommended 1200×800.</p>
+                    {imageMsg && (
+                      <p className={`text-[12px] font-semibold mt-xs ${imageMsg === "Image saved!" ? "text-green-600" : "text-red-500"}`}>
+                        {imageMsg}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Featured slots */}
