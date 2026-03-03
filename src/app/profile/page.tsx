@@ -39,7 +39,7 @@ export default function ProfilePage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Profile form
-  const [form, setForm] = useState({ displayName: "", nickname: "", gender: "", city: "", state: "", website: "" });
+  const [form, setForm] = useState({ firstName: "", lastName: "", nickname: "", gender: "", city: "", state: "", website: "" });
   const [saving, setSaving] = useState(false);
 
   // Password
@@ -58,8 +58,11 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user || dataLoaded) return;
     setDataLoaded(true);
+    // Populate first/last — use stored fields if set, else split displayName
+    const parts = (user.displayName || "").trim().split(" ");
     setForm({
-      displayName: user.displayName || "",
+      firstName: user.firstName || parts[0] || "",
+      lastName: user.lastName || parts.slice(1).join(" ") || "",
       nickname: user.nickname || "",
       gender: user.gender || "",
       city: user.city || "",
@@ -112,10 +115,13 @@ export default function ProfilePage() {
     if (!user) return;
     setSaving(true);
     try {
-      if (form.displayName.trim() && form.displayName !== user.displayName) {
-        await updateDisplayName(form.displayName.trim());
+      const fullName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ");
+      if (fullName && fullName !== user.displayName) {
+        await updateDisplayName(fullName);
       }
       await updateUserProfile(user.id, {
+        firstName: form.firstName.trim() || undefined,
+        lastName: form.lastName.trim() || undefined,
         nickname: form.nickname || undefined,
         gender: (form.gender as any) || undefined,
         city: form.city || undefined,
@@ -289,7 +295,8 @@ export default function ProfilePage() {
             <h3 className="text-[15px] font-semibold text-ls-primary">Personal Info</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
               {[
-                { key: "displayName", label: "Display Name", placeholder: "Your name" },
+                { key: "firstName", label: "First Name", placeholder: "Nguyễn" },
+                { key: "lastName", label: "Last Name", placeholder: "Văn A" },
                 { key: "nickname", label: "Nickname", placeholder: "e.g. Foodie Nguyen" },
                 { key: "city", label: "City", placeholder: "Garden Grove" },
                 { key: "state", label: "State", placeholder: "CA" },

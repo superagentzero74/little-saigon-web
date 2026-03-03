@@ -75,6 +75,8 @@ export interface AppUser {
   lastActive?: any;
   createdAt?: any;
   // Extended profile
+  firstName?: string;
+  lastName?: string;
   nickname?: string;
   gender?: "male" | "female" | "other" | "prefer_not" | null;
   city?: string;
