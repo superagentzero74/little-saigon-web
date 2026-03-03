@@ -57,17 +57,21 @@ export async function getTopRatedBusinesses(limitCount = 12): Promise<Business[]
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
 }
 
+function normalizeStr(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 export async function searchBusinesses(searchQuery: string): Promise<Business[]> {
   // Client-side filter for MVP. TODO: Algolia/Typesense
   const q = query(collection(db, "businesses"), orderBy("name"));
   const snap = await getDocs(q);
   const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
-  const lower = searchQuery.toLowerCase();
+  const needle = normalizeStr(searchQuery);
   return all.filter(
     (b) =>
-      b.name.toLowerCase().includes(lower) ||
-      b.address?.toLowerCase().includes(lower) ||
-      b.category?.toLowerCase().includes(lower)
+      normalizeStr(b.name).includes(needle) ||
+      normalizeStr(b.address || "").includes(needle) ||
+      normalizeStr(b.category || "").includes(needle)
   );
 }
 
