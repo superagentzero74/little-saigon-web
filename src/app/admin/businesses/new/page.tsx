@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, Loader2, CheckCircle, MapPin, Phone, Globe, Star, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, Loader2, CheckCircle, MapPin, Phone, Globe, Star, ChevronRight, X, ImageIcon } from "lucide-react";
 import { createBusiness, findDuplicateBusiness } from "@/lib/services";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import type { BusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 
@@ -59,6 +61,8 @@ export default function AddBusinessPage() {
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loadingDetails, setLoadingDetails] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(BLANK);
+  const [fetchedPhotos, setFetchedPhotos] = useState<string[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean; dupId?: string } | null>(null);
 
@@ -108,6 +112,27 @@ export default function AddBusinessPage() {
       setGoogleQuery("");
       setMsg({ text: `Loaded "${r.name}" from Google Places` });
       setTimeout(() => setMsg(null), 3000);
+
+      // Fetch up to 5 photo URLs in parallel
+      const photoRefs: string[] = (r.photos || []).slice(0, 5).map((p: any) => p.photo_reference).filter(Boolean);
+      if (photoRefs.length > 0) {
+        setLoadingPhotos(true);
+        const urls = await Promise.all(
+          photoRefs.map(async (ref) => {
+            try {
+              const res = await fetch(`/api/places/photo?ref=${encodeURIComponent(ref)}&maxwidth=800`);
+              const data = await res.json();
+              return data.url as string;
+            } catch {
+              return null;
+            }
+          })
+        );
+        setFetchedPhotos(urls.filter(Boolean) as string[]);
+        setLoadingPhotos(false);
+      } else {
+        setFetchedPhotos([]);
+      }
     } catch {
       setMsg({ text: "Failed to load place details", err: true });
     } finally {
@@ -146,6 +171,22 @@ export default function AddBusinessPage() {
         photos: [],
         active: form.active,
       } as any);
+
+      // Save fetched photos to the subcollection
+      if (fetchedPhotos.length > 0) {
+        const tags = ["outside", "inside", "food", "food", "other"] as const;
+        await Promise.all(
+          fetchedPhotos.map((url, i) =>
+            addDoc(collection(db, "businesses", id, "photos"), {
+              businessId: id,
+              url,
+              tag: tags[i] ?? "other",
+              createdAt: serverTimestamp(),
+            })
+          )
+        );
+      }
+
       router.push("/admin/businesses");
     } catch (err: any) {
       setMsg({ text: err.message || "Failed to save", err: true });
@@ -234,6 +275,44 @@ export default function AddBusinessPage() {
           </p>
         )}
       </div>
+
+      {/* Photo Previews */}
+      {(loadingPhotos || fetchedPhotos.length > 0) && (
+        <div className="bg-white rounded-card border border-ls-border p-lg mb-2xl">
+          <h2 className="text-[14px] font-semibold text-ls-primary mb-md flex items-center gap-sm">
+            <ImageIcon size={16} /> Photos from Google Places
+          </h2>
+          {loadingPhotos ? (
+            <div className="flex items-center gap-sm text-[13px] text-ls-secondary">
+              <Loader2 size={15} className="animate-spin" /> Fetching photos…
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-sm">
+                {fetchedPhotos.map((url, i) => (
+                  <div key={i} className="relative group">
+                    <img
+                      src={url}
+                      alt={`Photo ${i + 1}`}
+                      className="w-[120px] h-[90px] object-cover rounded-btn border border-ls-border"
+                    />
+                    <button
+                      onClick={() => setFetchedPhotos((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute top-[4px] right-[4px] bg-black/60 hover:bg-black/80 text-white rounded-full w-[20px] h-[20px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove photo"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-ls-secondary mt-sm">
+                {fetchedPhotos.length} photo{fetchedPhotos.length !== 1 ? "s" : ""} will be saved. Hover to remove any you don't want.
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Manual Form */}
       <div className="bg-white rounded-card border border-ls-border p-lg space-y-lg">

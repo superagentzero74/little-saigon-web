@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const fields = [
     "name", "formatted_address", "formatted_phone_number", "website",
     "rating", "user_ratings_total", "price_level",
-    "geometry", "place_id", "opening_hours", "types",
+    "geometry", "place_id", "opening_hours", "types", "photos",
   ].join(",");
   const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${key}`;
   const res = await fetch(url);
