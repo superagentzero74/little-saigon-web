@@ -475,6 +475,17 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 // Admin
 // ============================================
 
+export async function createBusiness(data: Omit<Business, "id">): Promise<string> {
+  const docRef = await addDoc(collection(db, "businesses"), {
+    ...data,
+    photos: data.photos || [],
+    active: data.active ?? true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
 export async function getAllUsers(limitCount = 50): Promise<AppUser[]> {
   const q = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(limitCount));
   const snap = await getDocs(q);

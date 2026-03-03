@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Search, Pencil, Check, X, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { Search, Pencil, Check, X, ExternalLink, Plus } from "lucide-react";
 import { getBusinesses, updateBusiness, searchBusinesses } from "@/lib/services";
 import type { Business, BusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
@@ -71,7 +72,12 @@ export default function AdminBusinessesPage() {
           <h1 className="text-[24px] font-bold text-ls-primary">Businesses</h1>
           <p className="text-[14px] text-ls-secondary mt-xs">{businesses.length} listings</p>
         </div>
-        {msg && <span className="text-[13px] font-semibold text-green-600">{msg}</span>}
+        <div className="flex items-center gap-md">
+          {msg && <span className="text-[13px] font-semibold text-green-600">{msg}</span>}
+          <Link href="/admin/businesses/new" className="ls-btn flex items-center gap-sm text-[13px]">
+            <Plus size={15} /> Add Business
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
