@@ -115,15 +115,31 @@ export async function uploadBusinessPhoto(
 // ============================================
 
 export async function getReviewsForBusiness(businessId: string, limitCount = 20): Promise<Review[]> {
-  const q = query(collection(db, "reviews"), where("businessId", "==", businessId), orderBy("createdAt", "desc"), limit(limitCount));
+  // No orderBy — avoids composite index requirement; sort client-side instead
+  const q = query(collection(db, "reviews"), where("businessId", "==", businessId), limit(limitCount));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Review[];
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Review)
+    .sort((a, b) => {
+      const aMs = a.createdAt?.toMillis?.() ?? (a.createdAt?.seconds ?? 0) * 1000;
+      const bMs = b.createdAt?.toMillis?.() ?? (b.createdAt?.seconds ?? 0) * 1000;
+      return bMs - aMs;
+    });
+}
+
+export async function getUserReviewForBusiness(businessId: string, userId: string): Promise<Review | null> {
+  const q = query(collection(db, "reviews"), where("businessId", "==", businessId), where("userId", "==", userId), limit(1));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as Review;
 }
 
 export async function hasUserReviewed(businessId: string, userId: string): Promise<boolean> {
-  const q = query(collection(db, "reviews"), where("businessId", "==", businessId), where("userId", "==", userId), limit(1));
-  const snap = await getDocs(q);
-  return !snap.empty;
+  return (await getUserReviewForBusiness(businessId, userId)) !== null;
+}
+
+export async function updateReview(reviewId: string, rating: number, text: string): Promise<void> {
+  await updateDoc(doc(db, "reviews", reviewId), { rating, text, updatedAt: serverTimestamp() });
 }
 
 export async function submitReview(

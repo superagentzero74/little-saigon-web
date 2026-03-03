@@ -14,7 +14,7 @@ import type { Business, Review, BusinessPhoto, PhotoTag } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 import {
   getBusinessById, getReviewsForBusiness, getBusinessPhotos,
-  submitReview, hasUserReviewed, checkIn, toggleFavorite,
+  submitReview, updateReview, getUserReviewForBusiness, checkIn, toggleFavorite,
   uploadBusinessPhoto, getUserFavorites,
 } from "@/lib/services";
 import { isCurrentlyOpen, formatPriceLevel, getDirectionsUrl } from "@/lib/utils";
@@ -41,6 +41,7 @@ export default function BusinessDetailPage() {
   const [reviewText, setReviewText] = useState("");
   const [reviewHover, setReviewHover] = useState(0);
   const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+  const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [checkInSuccess, setCheckInSuccess] = useState(false);
@@ -65,11 +66,16 @@ export default function BusinessDetailPage() {
         if (picResult.status === "fulfilled") setPhotos(picResult.value);
 
         if (user) {
-          const [reviewed, favs] = await Promise.all([
-            hasUserReviewed(biz.id, user.id),
+          const [existingReview, favs] = await Promise.all([
+            getUserReviewForBusiness(biz.id, user.id),
             getUserFavorites(user.id),
           ]);
-          setAlreadyReviewed(reviewed);
+          if (existingReview) {
+            setAlreadyReviewed(true);
+            setExistingReviewId(existingReview.id);
+            setReviewRating(existingReview.rating);
+            setReviewText(existingReview.text || "");
+          }
           setIsFavorited(favs.includes(biz.id));
         }
       }
@@ -115,14 +121,23 @@ export default function BusinessDetailPage() {
     if (!business || reviewRating === 0) return;
     setSubmittingReview(true);
     try {
-      const newReview = await submitReview(business.id, reviewRating, reviewText);
-      setReviews([{ ...newReview, createdAt: new Date() } as any, ...reviews]);
+      if (existingReviewId) {
+        // Edit existing review
+        await updateReview(existingReviewId, reviewRating, reviewText);
+        setReviews(reviews.map((r) =>
+          r.id === existingReviewId ? { ...r, rating: reviewRating, text: reviewText } : r
+        ));
+        setMessage("Review updated!");
+      } else {
+        // New review
+        const newReview = await submitReview(business.id, reviewRating, reviewText);
+        setReviews([{ ...newReview, createdAt: new Date() } as any, ...reviews]);
+        setExistingReviewId(newReview.id);
+        setAlreadyReviewed(true);
+        setMessage("+25 Đồng earned!");
+        await refreshProfile();
+      }
       setShowReviewForm(false);
-      setAlreadyReviewed(true);
-      setReviewRating(0);
-      setReviewText("");
-      setMessage("+25 Đồng earned!");
-      await refreshProfile();
       setTimeout(() => setMessage(""), 3000);
     } catch (err: any) {
       setMessage(err.message || "Failed to submit review");
@@ -308,12 +323,12 @@ export default function BusinessDetailPage() {
                   Reviews
                   {reviews.length > 0 && <span className="text-meta text-ls-secondary font-normal ml-sm">({reviews.length})</span>}
                 </h2>
-                {!alreadyReviewed && !showReviewForm && (
+                {!showReviewForm && (
                   <button
                     onClick={() => user ? setShowReviewForm(true) : router.push("/login")}
                     className="ls-btn text-[13px] py-sm px-lg"
                   >
-                    Write Review (+25 Đồng)
+                    {alreadyReviewed ? "Edit Review" : "Write Review (+25 Đồng)"}
                   </button>
                 )}
               </div>
@@ -322,7 +337,7 @@ export default function BusinessDetailPage() {
               {showReviewForm && (
                 <form onSubmit={handleSubmitReview} className="ls-card mb-lg">
                   <div className="flex items-center justify-between mb-md">
-                    <h3 className="text-[14px] font-semibold text-ls-primary">Your Review</h3>
+                    <h3 className="text-[14px] font-semibold text-ls-primary">{existingReviewId ? "Edit Your Review" : "Your Review"}</h3>
                     <button type="button" onClick={() => setShowReviewForm(false)}><X size={18} className="text-ls-secondary" /></button>
                   </div>
 
@@ -367,7 +382,7 @@ export default function BusinessDetailPage() {
                       disabled={reviewRating === 0 || submittingReview}
                       className="ls-btn text-[13px] py-sm px-lg disabled:opacity-50"
                     >
-                      {submittingReview ? "Submitting..." : "Submit Review"}
+                      {submittingReview ? "Saving..." : existingReviewId ? "Update Review" : "Submit Review"}
                     </button>
                   </div>
                 </form>
