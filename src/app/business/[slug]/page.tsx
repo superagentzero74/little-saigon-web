@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   MapPin, Phone, Globe, Clock, ChevronLeft, ChevronRight, Navigation,
-  Star, Heart, Camera, CheckCircle, X,
+  Star, Heart, Camera, CheckCircle, X, Pencil,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "@/contexts/LocationContext";
@@ -195,6 +195,17 @@ export default function BusinessDetailPage() {
 
   return (
     <div>
+      {/* Admin floating edit button */}
+      {user?.role === "admin" && business && (
+        <Link
+          href={`/admin/businesses/${business.id}/edit`}
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-ls-primary text-white flex items-center gap-xs pl-sm pr-md py-sm rounded-r-btn shadow-lg hover:bg-ls-primary/90 transition-colors"
+        >
+          <Pencil size={13} />
+          <span className="text-[12px] font-semibold">Edit</span>
+        </Link>
+      )}
+
       {/* Check-in success overlay */}
       {checkInSuccess && (
         <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center">
