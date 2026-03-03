@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ChevronLeft, ChevronRight, UtensilsCrossed,
-  Check, ArrowRight, Trophy, MapPin, Navigation,
+  Check, ArrowRight, Trophy, MapPin, Navigation, Pencil,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { MonVietDish, Business } from "@/lib/types";
@@ -245,6 +245,17 @@ export default function DishDetailPage() {
 
   return (
     <div className="ls-container py-2xl">
+      {/* Admin floating edit button */}
+      {user?.role === "admin" && (
+        <Link
+          href={`/admin/guide?dish=${dish.rank}`}
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-ls-primary text-white flex items-center gap-xs pl-sm pr-md py-sm rounded-r-btn shadow-lg hover:bg-ls-primary/90 transition-colors"
+        >
+          <Pencil size={13} />
+          <span className="text-[12px] font-semibold">Edit</span>
+        </Link>
+      )}
+
       {message && (
         <div className="mb-lg p-md bg-green-50 border border-green-200 rounded-btn text-[13px] text-green-700">
           {message}

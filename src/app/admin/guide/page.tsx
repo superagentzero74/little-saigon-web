@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Trophy, X, Search, Save, ArrowUp, ArrowDown, ImageIcon, Upload, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +23,7 @@ const MEDAL_CONFIG = [
 export default function GuideAdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [dishes, setDishes] = useState<MonVietDish[]>([]);
   const [selectedDish, setSelectedDish] = useState<MonVietDish | null>(null);
@@ -44,10 +45,17 @@ export default function GuideAdminPage() {
     }
   }, [user, authLoading, router]);
 
-  // Load all dishes
+  // Load all dishes, then pre-select if ?dish=rank is in URL
   useEffect(() => {
-    getDishes().then(setDishes);
-  }, []);
+    getDishes().then((loaded) => {
+      setDishes(loaded);
+      const rankParam = searchParams.get("dish");
+      if (rankParam) {
+        const match = loaded.find((d) => d.rank === parseInt(rankParam));
+        if (match) setSelectedDish(match);
+      }
+    });
+  }, [searchParams]);
 
   // Load featured when dish selected
   useEffect(() => {
