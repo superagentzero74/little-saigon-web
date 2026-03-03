@@ -83,7 +83,7 @@ export default function HomePage() {
         {/* Content */}
         <div className="relative ls-container py-[48px] md:py-[80px]">
           <p className="text-meta text-white/70 uppercase tracking-widest mb-sm">
-            Westminster · Garden Grove · Fountain Valley
+            Westminster · Garden Grove · Fountain Valley · Santa Ana
           </p>
           <h1 className="text-[36px] md:text-[52px] font-bold leading-tight">
             Xin Chào!
@@ -207,7 +207,7 @@ export default function HomePage() {
           <div className="flex items-center justify-center gap-xs text-ls-secondary mb-sm">
             <MapPin size={16} />
             <span className="text-meta uppercase tracking-wider">
-              Westminster · Garden Grove · Fountain Valley
+              Westminster · Garden Grove · Fountain Valley · Santa Ana
             </span>
           </div>
           <h2 className="text-[22px] font-bold text-ls-primary">
