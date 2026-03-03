@@ -259,6 +259,28 @@ export async function updateUserProfile(userId: string, data: Partial<AppUser>):
   await updateDoc(doc(db, "users", userId), { ...data, lastActive: serverTimestamp() });
 }
 
+export async function getUserReviews(userId: string): Promise<Review[]> {
+  const q = query(collection(db, "reviews"), where("userId", "==", userId));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Review)
+    .sort((a, b) => {
+      const aMs = a.createdAt?.toMillis?.() ?? (a.createdAt?.seconds ?? 0) * 1000;
+      const bMs = b.createdAt?.toMillis?.() ?? (b.createdAt?.seconds ?? 0) * 1000;
+      return bMs - aMs;
+    });
+}
+
+export async function uploadUserAvatar(userId: string, file: File): Promise<string> {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `users/${userId}/avatar.${ext}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  await updateDoc(doc(db, "users", userId), { photoURL: url, lastActive: serverTimestamp() });
+  return url;
+}
+
 // ============================================
 // Favorites
 // ============================================

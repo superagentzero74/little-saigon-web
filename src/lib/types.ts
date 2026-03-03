@@ -74,6 +74,12 @@ export interface AppUser {
   checkedDishes?: number[];
   lastActive?: any;
   createdAt?: any;
+  // Extended profile
+  nickname?: string;
+  gender?: "male" | "female" | "other" | "prefer_not" | null;
+  city?: string;
+  state?: string;
+  website?: string;
 }
 
 export interface CheckIn {
