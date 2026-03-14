@@ -12,40 +12,24 @@ import DishCard from "@/components/guide/DishCard";
 
 
 export default function HomePage() {
-  const [topRated, setTopRated] = useState<Business[]>([]);
-  const [dishes, setDishes] = useState<MonVietDish[]>([]);
+  const [topRated, setTopRated] = useState<Business[] | null>(null);
+  const [dishes, setDishes] = useState<MonVietDish[] | null>(null);
   const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
   const [visibleCategories, setVisibleCategories] = useState<BusinessCategory[] | null>(null);
   const [showIcons, setShowIcons] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [settingsReady, setSettingsReady] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [bizResult, dishResult, settingsResult, bannersResult] = await Promise.allSettled([
-          getTopRatedBusinesses(12),
-          getDishes(),
-          getPageSettings(),
-          getPromoBanners(),
-        ]);
-        if (bizResult.status === "fulfilled") setTopRated(bizResult.value);
-        else console.error("Failed to load businesses:", bizResult.reason);
-        if (dishResult.status === "fulfilled") setDishes(dishResult.value.slice(0, 16));
-        else console.error("Failed to load dishes:", dishResult.reason);
-        if (bannersResult.status === "fulfilled") {
-          setPromoBanners(bannersResult.value.filter((b) => b.active));
-        }
-        if (settingsResult.status === "fulfilled") {
-          const s = settingsResult.value;
-          const cats = s.home?.categories || s.homeCategories;
-          if (cats) setVisibleCategories(cats as BusinessCategory[]);
-          if (s.home?.showIcons === false) setShowIcons(false);
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    // Fire all requests independently so each section renders as soon as its data arrives
+    getTopRatedBusinesses(12).then(setTopRated).catch(() => setTopRated([]));
+    getDishes().then((all) => setDishes(all.slice(0, 16))).catch(() => setDishes([]));
+    getPromoBanners().then((b) => setPromoBanners(b.filter((x) => x.active))).catch(() => {});
+    getPageSettings().then((s) => {
+      const cats = s.home?.categories || s.homeCategories;
+      if (cats) setVisibleCategories(cats as BusinessCategory[]);
+      if (s.home?.showIcons === false) setShowIcons(false);
+      setSettingsReady(true);
+    }).catch(() => setSettingsReady(true));
   }, []);
 
   const allCategories = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
@@ -175,7 +159,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {loading ? (
+          {dishes === null ? (
             <div className="flex gap-lg overflow-hidden">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="w-[180px] flex-shrink-0 animate-pulse">
@@ -221,7 +205,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {loading ? (
+          {topRated === null ? (
             <div className="flex gap-lg overflow-hidden">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="w-[200px] flex-shrink-0 animate-pulse">
