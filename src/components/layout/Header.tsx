@@ -5,9 +5,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard, Building2 } from "lucide-react";
+import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard, Building2, ChevronDown } from "lucide-react";
 import { CATEGORIES } from "@/lib/types";
-import type { BusinessCategory } from "@/lib/types";
+import type { BusinessCategory, SubcategoryInfo } from "@/lib/types";
+import { getSubcategories } from "@/lib/services";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
@@ -17,6 +18,12 @@ export default function Header() {
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [hoveredCategory, setHoveredCategory] = useState<BusinessCategory | null>(null);
+  const [subcategories, setSubcategories] = useState<SubcategoryInfo[]>([]);
+
+  useEffect(() => {
+    getSubcategories().then(setSubcategories).catch(() => {});
+  }, []);
 
   const suggestedSearches = [
     "Phở", "Bánh Mì", "Bún Bò Huế", "Cơm Tấm", "Boba",
@@ -322,24 +329,65 @@ export default function Header() {
     </header>
 
     {/* Category Nav Bar — desktop only */}
-    {/* Category Nav Bar — desktop only */}
     <div
       className="hidden md:block fixed left-0 right-0 bg-white border-b border-ls-border"
       style={{ top: 56, zIndex: 9998 }}
+      onMouseLeave={() => setHoveredCategory(null)}
     >
       <div className="ls-container">
         <nav className="flex items-center gap-0" style={{ scrollbarWidth: "none" }}>
           {(Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][]).map(([key, { label }]) => (
-            <Link
+            <div
               key={key}
-              href={`/category/${key}`}
-              className="px-md py-[10px] text-[13px] font-medium whitespace-nowrap transition-colors border-b-2 text-ls-secondary border-transparent hover:text-ls-primary hover:border-ls-primary"
+              onMouseEnter={() => setHoveredCategory(key)}
             >
-              {label}
-            </Link>
+              <Link
+                href={`/category/${key}`}
+                className={`flex items-center gap-[3px] px-md py-[10px] text-[13px] font-medium whitespace-nowrap transition-colors border-b-2 ${
+                  hoveredCategory === key
+                    ? "text-ls-primary border-ls-primary"
+                    : "text-ls-secondary border-transparent hover:text-ls-primary"
+                }`}
+              >
+                {label}
+                <ChevronDown size={12} className="opacity-50" />
+              </Link>
+            </div>
           ))}
         </nav>
       </div>
+
+      {/* Subcategory dropdown */}
+      {hoveredCategory && (() => {
+        const subs = subcategories.filter((s) => s.parentSlug === hoveredCategory && s.isActive);
+        const catLabel = CATEGORIES[hoveredCategory]?.label || "";
+        return (
+          <div className="border-t border-ls-border bg-white shadow-xl">
+            <div className="ls-container py-md">
+              {subs.length > 0 ? (
+                <div className={`grid gap-0 ${subs.length > 4 ? "grid-cols-2 max-w-[480px]" : "grid-cols-1 max-w-[240px]"}`}>
+                  {subs.map((sub) => (
+                    <Link
+                      key={sub.slug}
+                      href={`/category/${hoveredCategory}?sub=${encodeURIComponent(sub.slug)}`}
+                      className="flex items-center gap-sm px-lg py-[8px] text-[13px] text-ls-primary hover:bg-ls-surface rounded transition-colors whitespace-nowrap"
+                    >
+                      {sub.name}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <Link
+                  href={`/category/${hoveredCategory}`}
+                  className="block px-lg py-[8px] text-[13px] text-ls-primary hover:bg-ls-surface rounded transition-colors"
+                >
+                  Browse all {catLabel.toLowerCase()}
+                </Link>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
 
     {/* Spacer to push content below the fixed header + category bar */}
