@@ -1,5 +1,7 @@
 import Link from "next/link";
-import InstagramFeed from "./InstagramFeed";
+import dynamic from "next/dynamic";
+
+const InstagramFeed = dynamic(() => import("./InstagramFeed"), { ssr: false });
 
 export default function Footer() {
   return (
