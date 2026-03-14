@@ -135,7 +135,7 @@ export default function AdminDashboard() {
         {[
           { href: "/admin/businesses", label: "Manage Businesses", desc: "Edit listings, toggle active status" },
           { href: "/admin/users", label: "Manage Users", desc: "View users, assign admin roles" },
-          { href: "/admin/guide", label: "Món Việt Guide", desc: "Curate best restaurants per dish" },
+          { href: "/admin/guide", label: "Food Guide", desc: "Manage foods list and featured restaurants" },
         ].map(({ href, label, desc }) => (
           <Link key={href} href={href} className="bg-white rounded-card border border-ls-border p-lg hover:shadow-sm transition-shadow group">
             <p className="text-[14px] font-semibold text-ls-primary group-hover:text-ls-primary">{label}</p>

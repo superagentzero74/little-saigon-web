@@ -3,7 +3,8 @@
 // Matches Firestore schema from BLUEPRINT.md
 // ============================================
 
-export type BusinessCategory =
+// Legacy single-value category (kept for backward compat during migration)
+export type LegacyBusinessCategory =
   | "restaurant"
   | "bakery"
   | "cafe"
@@ -11,6 +12,56 @@ export type BusinessCategory =
   | "beauty"
   | "shopping"
   | "business";
+
+// New 10 top-level categories
+export type BusinessCategory =
+  | "restaurant"
+  | "coffee_tea"
+  | "bakery_dessert"
+  | "grocery"
+  | "beauty"
+  | "shopping"
+  | "services"
+  | "health"
+  | "entertainment"
+  | "community";
+
+export type SubcategorySlug = string; // validated against subcategories collection
+
+export interface CategoryInfo {
+  slug: BusinessCategory;
+  name: string;
+  nameViet: string;
+  icon: string;
+  order: number;
+  isActive: boolean;
+}
+
+export interface SubcategoryInfo {
+  slug: string;
+  name: string;
+  parentSlug: BusinessCategory;
+  description: string;
+  order: number;
+  isActive: boolean;
+}
+
+export type DayOfWeek = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+
+export const DAYS_OF_WEEK: DayOfWeek[] = [
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+];
+
+export const DAY_ABBREV: Record<DayOfWeek, string> = {
+  Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu",
+  Friday: "Fri", Saturday: "Sat", Sunday: "Sun",
+};
+
+export interface StructuredHourSlot {
+  day: DayOfWeek;
+  open: string;  // "HH:mm" 24h format
+  close: string; // "HH:mm" 24h format
+}
 
 export interface Business {
   id: string;
@@ -21,10 +72,13 @@ export interface Business {
   rating: number;
   totalRatings: number;
   priceLevel?: number;
-  category: BusinessCategory;
+  category: LegacyBusinessCategory; // legacy — kept for backward compat
+  categories?: BusinessCategory[]; // new — up to 3
+  subcategories?: SubcategorySlug[]; // new
   types?: string[];
   photos: string[];
   hours?: string[];
+  structuredHours?: StructuredHourSlot[];
   description?: string;
   isOpen?: boolean;
   status?: string;
@@ -59,6 +113,8 @@ export interface BusinessPhoto {
   userId?: string;
   url: string;
   tag: PhotoTag;
+  foodTags?: string[];
+  description?: string;
   order?: number;
   createdAt?: any;
 }
@@ -189,14 +245,45 @@ export interface Pick {
 }
 
 export const CATEGORIES: Record<BusinessCategory, { label: string; icon: string }> = {
-  restaurant: { label: "Restaurant", icon: "🍜" },
-  bakery: { label: "Bakery", icon: "🥐" },
-  cafe: { label: "Cafe", icon: "☕" },
-  grocery: { label: "Grocery", icon: "🛒" },
-  beauty: { label: "Beauty & Nails", icon: "✨" },
-  shopping: { label: "Shopping", icon: "🛍️" },
-  business: { label: "Business", icon: "🏢" },
+  restaurant: { label: "Restaurants", icon: "🍜" },
+  coffee_tea: { label: "Coffee & Tea", icon: "☕" },
+  bakery_dessert: { label: "Bakery & Dessert", icon: "🥖" },
+  grocery: { label: "Grocery & Markets", icon: "🛒" },
+  beauty: { label: "Beauty & Wellness", icon: "💅" },
+  shopping: { label: "Shopping & Retail", icon: "🛍️" },
+  services: { label: "Services", icon: "🔧" },
+  health: { label: "Health & Medical", icon: "🏥" },
+  entertainment: { label: "Events & Entertainment", icon: "🎪" },
+  community: { label: "Community & Education", icon: "🏛️" },
 };
+
+// Legacy mapping for backward compat during migration
+export const LEGACY_CATEGORY_MAP: Record<LegacyBusinessCategory, BusinessCategory> = {
+  restaurant: "restaurant",
+  bakery: "bakery_dessert",
+  cafe: "coffee_tea",
+  grocery: "grocery",
+  beauty: "beauty",
+  shopping: "shopping",
+  business: "services",
+};
+
+/** Resolve category info for a business (handles both legacy and new category fields) */
+export function getCategoryInfo(business: { category?: string; categories?: string[] }): { label: string; icon: string } {
+  // Prefer new categories array
+  if (business.categories && business.categories.length > 0) {
+    const cat = business.categories[0] as BusinessCategory;
+    if (CATEGORIES[cat]) return CATEGORIES[cat];
+  }
+  // Fall back to legacy category field
+  if (business.category) {
+    const mapped = LEGACY_CATEGORY_MAP[business.category as LegacyBusinessCategory];
+    if (mapped && CATEGORIES[mapped]) return CATEGORIES[mapped];
+    // Direct match (e.g. "restaurant", "grocery" exist in both)
+    if (CATEGORIES[business.category as BusinessCategory]) return CATEGORIES[business.category as BusinessCategory];
+  }
+  return { label: "Business", icon: "🏢" };
+}
 
 export interface DishFeaturedEntry {
   businessId: string;
@@ -210,6 +297,15 @@ export interface DishFeatured {
   updatedBy?: string;
 }
 
+export interface PromoBanner {
+  id: string;
+  imageURL: string;
+  linkType: "search" | "food" | "category" | "url";
+  linkValue: string;
+  order: number;
+  active: boolean;
+}
+
 export const POINTS = {
   REVIEW: 25,
   CHECK_IN: 10,
@@ -217,3 +313,91 @@ export const POINTS = {
   DISH_CHECK: 5,
   CHALLENGE_BONUS: 50,
 } as const;
+
+// ============================================
+// Promotions
+// ============================================
+
+export type OfferType = "percent_off" | "fixed_off" | "free_item" | "double_dong" | "bonus_dong" | "bogo";
+
+export const OFFER_TYPES: Record<OfferType, { label: string; icon: string }> = {
+  percent_off: { label: "% Off", icon: "Percent" },
+  fixed_off: { label: "$ Off", icon: "DollarSign" },
+  free_item: { label: "Free Item", icon: "Gift" },
+  double_dong: { label: "2x Đồng", icon: "ArrowUpRight" },
+  bonus_dong: { label: "Bonus Đồng", icon: "PlusCircle" },
+  bogo: { label: "BOGO", icon: "Copy" },
+};
+
+export type PromotionStatus = "draft" | "active" | "paused" | "ended";
+
+export type IssuanceTrigger =
+  | "onInstall"
+  | "onProfileComplete"
+  | "onFirstReview"
+  | "onReviewCount"
+  | "onCheckinMilestone"
+  | "onChallengeComplete"
+  | "onReferral"
+  | "onBirthday"
+  | "adminManual"
+  | "adminCampaign";
+
+export const ISSUANCE_TRIGGERS: Record<IssuanceTrigger, string> = {
+  onInstall: "New User Signup",
+  onProfileComplete: "Profile Completed",
+  onFirstReview: "First Review",
+  onReviewCount: "Review Milestone",
+  onCheckinMilestone: "Check-in Milestone",
+  onChallengeComplete: "Challenge Complete",
+  onReferral: "Referral",
+  onBirthday: "Birthday",
+  adminManual: "Manual (Admin)",
+  adminCampaign: "Campaign (Bulk)",
+};
+
+export interface Promotion {
+  id: string;
+  businessId: string;
+  businessName: string;
+  title: string;
+  description: string;
+  termsAndConditions: string;
+  type: OfferType;
+  discountValue?: number | null;
+  itemDescription?: string | null;
+  dongBonus: number;
+  issuanceTrigger: IssuanceTrigger;
+  triggerParams?: Record<string, any> | null;
+  validFrom?: any;
+  validUntil?: any;
+  usageLimitPerUser: number;
+  usageLimitTotal?: number | null;
+  status: PromotionStatus;
+  createdBy?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  imageUrl?: string | null;
+  badgeColor?: string | null;
+}
+
+export interface UserOffer {
+  id: string;
+  userOfferId: string;
+  userId: string;
+  promotionId: string;
+  businessId: string;
+  businessName: string;
+  title: string;
+  description: string;
+  type: OfferType;
+  status: "issued" | "saved" | "redeemed" | "expired";
+  issuedAt?: any;
+  issuedBy?: string;
+  expiresAt?: any;
+  redeemedAt?: any;
+  redeemedAtBusinessId?: string | null;
+  scannedByOwnerId?: string | null;
+  qrPayload: string;
+  qrNonce: string;
+}

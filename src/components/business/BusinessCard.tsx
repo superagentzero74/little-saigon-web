@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Business } from "@/lib/types";
-import { CATEGORIES } from "@/lib/types";
+import { getCategoryInfo } from "@/lib/types";
 import { businessSlug, formatPriceLevel, isCurrentlyOpen } from "@/lib/utils";
 import StarRating from "@/components/ui/StarRating";
 import OpenStatus from "@/components/ui/OpenStatus";
@@ -13,8 +13,8 @@ interface BusinessCardProps {
 
 export default function BusinessCard({ business }: BusinessCardProps) {
   const slug = businessSlug(business);
-  const catInfo = CATEGORIES[business.category];
-  const openStatus = isCurrentlyOpen(business.hours);
+  const catInfo = getCategoryInfo(business);
+  const openStatus = isCurrentlyOpen(business.hours, business.structuredHours);
   const photoUrl = business.photos?.[0];
 
   return (

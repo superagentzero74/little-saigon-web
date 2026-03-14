@@ -20,6 +20,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "storage.googleapis.com",
+      },
+      {
+        protocol: "https",
         hostname: "little-saigon-c055a.firebasestorage.app",
       },
     ],

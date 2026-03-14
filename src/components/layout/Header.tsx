@@ -1,18 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard, Building2 } from "lucide-react";
+import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard, Building2, ChevronDown } from "lucide-react";
+import { CATEGORIES } from "@/lib/types";
+import type { BusinessCategory, SubcategoryInfo } from "@/lib/types";
+import { getSubcategories } from "@/lib/services";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
+  const [showHamburger, setShowHamburger] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [hoveredCategory, setHoveredCategory] = useState<BusinessCategory | null>(null);
+  const [subcategories, setSubcategories] = useState<SubcategoryInfo[]>([]);
+
+  useEffect(() => {
+    getSubcategories().then(setSubcategories).catch(() => {});
+  }, []);
+
+  const suggestedSearches = [
+    "Phở", "Bánh Mì", "Bún Bò Huế", "Cơm Tấm", "Boba",
+    "Coffee", "Chè", "Bánh Cuốn", "Bún Chả", "Gỏi Cuốn",
+    "Bakery", "Nails", "Vegan", "Late Night", "Dessert",
+  ];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,52 +43,77 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-ls-border">
+    <>
+    {/* Fixed header on its own stacking layer */}
+    <header className="fixed top-0 left-0 right-0 bg-white border-b border-ls-border" style={{ zIndex: 9999, isolation: "isolate" }}>
       <div className="ls-container flex items-center gap-md h-[56px]">
-        {/* Logo */}
-        <Link href="/" className="shrink-0">
+        {/* Logo — force hard navigation to home */}
+        <button
+          type="button"
+          onClick={() => { window.location.href = "/"; }}
+          className="shrink-0 block cursor-pointer bg-transparent border-0 p-0"
+        >
           <Image
             src="/lso-logo.png"
             alt="Little Saigon Official"
             width={160}
             height={40}
-            className="h-[40px] w-auto"
+            className="h-[40px] w-auto pointer-events-none"
           />
-        </Link>
+        </button>
 
         {/* Search bar — desktop */}
-        <form
-          onSubmit={handleSearch}
-          className="hidden md:flex items-center flex-1 max-w-[420px] border border-ls-border rounded-full overflow-hidden bg-gray-100 focus-within:bg-white focus-within:border-ls-primary transition-colors"
-        >
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search restaurants, dishes…"
-            className="flex-1 min-w-0 px-lg py-[7px] text-[14px] text-ls-primary placeholder:text-ls-secondary outline-none bg-transparent"
-          />
-          <button
-            type="submit"
-            className="shrink-0 h-[36px] w-[42px] flex items-center justify-center bg-ls-primary hover:bg-ls-primary/90 transition-colors"
-            aria-label="Search"
+        <div className="hidden md:block relative flex-1 max-w-[420px]">
+          <form
+            onSubmit={handleSearch}
+            className="flex items-center border border-ls-border rounded-full overflow-hidden bg-gray-100 focus-within:bg-white focus-within:border-ls-primary transition-colors"
           >
-            <Search size={17} className="text-white" />
-          </button>
-        </form>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              placeholder="Search restaurants, foods…"
+              className="flex-1 min-w-0 px-lg py-[7px] text-[14px] text-ls-primary placeholder:text-ls-secondary outline-none bg-transparent"
+            />
+            <button
+              type="submit"
+              className="shrink-0 h-[36px] w-[42px] flex items-center justify-center bg-ls-primary hover:bg-ls-primary/90 transition-colors"
+              aria-label="Search"
+            >
+              <Search size={17} className="text-white" />
+            </button>
+          </form>
+          {searchFocused && !searchQuery && (
+            <div className="absolute top-[44px] left-0 right-0 bg-white border border-ls-border rounded-card shadow-lg p-sm z-50">
+              <p className="text-[11px] text-ls-secondary uppercase tracking-wider px-sm pb-xs">Suggested</p>
+              <div className="flex flex-wrap gap-xs">
+                {suggestedSearches.map((term) => (
+                  <button
+                    key={term}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSearchQuery(term);
+                      setSearchFocused(false);
+                      router.push(`/explore?q=${encodeURIComponent(term)}`);
+                    }}
+                    className="px-md py-xs text-[13px] text-ls-primary bg-ls-surface hover:bg-ls-primary hover:text-white rounded-full transition-colors"
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-xl ml-auto">
           <Link href="/explore" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
             <Compass size={16} /> Explore
           </Link>
-          <Link href="/guide" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
-            <BookOpen size={16} /> Top 50 Món Việt
-          </Link>
-          <Link href="/rewards" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
-            <Gift size={16} /> Rewards
-          </Link>
-
           {loading ? (
             <div className="w-[32px] h-[32px] rounded-full bg-ls-surface animate-pulse" />
           ) : user ? (
@@ -147,6 +189,38 @@ export default function Header() {
               Sign In
             </Link>
           )}
+
+          {/* Hamburger menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowHamburger(!showHamburger)}
+              className="p-sm text-ls-secondary hover:text-ls-primary transition-colors"
+              aria-label="More"
+            >
+              <Menu size={20} />
+            </button>
+            {showHamburger && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowHamburger(false)} />
+                <div className="absolute right-0 top-[44px] z-50 bg-white border border-ls-border rounded-card w-[200px] py-sm shadow-lg">
+                  <Link
+                    href="/guide"
+                    onClick={() => setShowHamburger(false)}
+                    className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-primary hover:bg-ls-surface transition-colors"
+                  >
+                    <BookOpen size={16} /> Food Guide
+                  </Link>
+                  <Link
+                    href="/rewards"
+                    onClick={() => setShowHamburger(false)}
+                    className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-primary hover:bg-ls-surface transition-colors"
+                  >
+                    <Gift size={16} /> Rewards
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
         </nav>
 
         {/* Mobile: hamburger */}
@@ -160,13 +234,15 @@ export default function Header() {
       </div>
 
       {/* Mobile search bar — always visible below the header row */}
-      <div className="md:hidden border-t border-ls-border bg-white px-4 py-2">
+      <div className="md:hidden border-t border-ls-border bg-white px-4 py-2 relative">
         <form onSubmit={handleSearch} className="flex items-center border border-ls-border rounded-full overflow-hidden bg-gray-100 focus-within:bg-white focus-within:border-ls-primary transition-colors">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search restaurants, dishes…"
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            placeholder="Search restaurants, foods…"
             className="flex-1 min-w-0 px-lg py-[7px] text-[14px] text-ls-primary placeholder:text-ls-secondary outline-none bg-transparent"
           />
           <button
@@ -177,17 +253,40 @@ export default function Header() {
             <Search size={17} className="text-white" />
           </button>
         </form>
+        {searchFocused && !searchQuery && (
+          <div className="absolute top-full left-0 right-0 bg-white border-b border-ls-border shadow-lg p-sm z-50">
+            <p className="text-[11px] text-ls-secondary uppercase tracking-wider px-sm pb-xs">Suggested</p>
+            <div className="flex flex-wrap gap-xs">
+              {suggestedSearches.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setSearchQuery(term);
+                    setSearchFocused(false);
+                    router.push(`/explore?q=${encodeURIComponent(term)}`);
+                    setShowMobileNav(false);
+                  }}
+                  className="px-md py-xs text-[13px] text-ls-primary bg-ls-surface hover:bg-ls-primary hover:text-white rounded-full transition-colors"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Mobile Nav Drawer */}
       {showMobileNav && (
         <div className="md:hidden border-t border-ls-border bg-white pb-lg">
           <nav className="ls-container flex flex-col gap-sm pt-md">
+            <Link href="/guide" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+              <BookOpen size={18} /> Food Guide
+            </Link>
             <Link href="/explore" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
               <Compass size={18} /> Explore
-            </Link>
-            <Link href="/guide" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
-              <BookOpen size={18} /> Top 50 Món Việt
             </Link>
             <Link href="/rewards" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
               <Gift size={18} /> Rewards
@@ -228,5 +327,72 @@ export default function Header() {
         </div>
       )}
     </header>
+
+    {/* Category Nav Bar — desktop only */}
+    <div
+      className="hidden md:block fixed left-0 right-0 bg-white border-b border-ls-border"
+      style={{ top: 56, zIndex: 9998 }}
+      onMouseLeave={() => setHoveredCategory(null)}
+    >
+      <div className="ls-container">
+        <nav className="flex items-center gap-0" style={{ scrollbarWidth: "none" }}>
+          {(Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][]).map(([key, { label, icon }]) => (
+            <div
+              key={key}
+              onMouseEnter={() => setHoveredCategory(key)}
+            >
+              <Link
+                href={`/category/${key}`}
+                className={`flex items-center gap-[3px] px-md py-[10px] text-[13px] font-medium whitespace-nowrap transition-colors border-b-2 ${
+                  hoveredCategory === key
+                    ? "text-ls-primary border-ls-primary"
+                    : "text-ls-secondary border-transparent hover:text-ls-primary"
+                }`}
+              >
+                {label}
+                <ChevronDown size={12} className="opacity-50" />
+              </Link>
+            </div>
+          ))}
+        </nav>
+      </div>
+
+      {/* Subcategory dropdown — renders below the nav bar, inside the same hover container */}
+      {hoveredCategory && (() => {
+        const subs = subcategories.filter((s) => s.parentSlug === hoveredCategory && s.isActive);
+        const catLabel = CATEGORIES[hoveredCategory]?.label || "";
+        return (
+          <div className="border-t border-ls-border bg-white shadow-xl">
+            <div className="ls-container py-md">
+              {subs.length > 0 ? (
+                <div className={`grid gap-0 ${subs.length > 4 ? "grid-cols-2 max-w-[480px]" : "grid-cols-1 max-w-[240px]"}`}>
+                  {subs.map((sub) => (
+                    <Link
+                      key={sub.slug}
+                      href={`/category/${hoveredCategory}?sub=${encodeURIComponent(sub.slug)}`}
+                      className="flex items-center gap-sm px-lg py-[8px] text-[13px] text-ls-primary hover:bg-ls-surface rounded transition-colors whitespace-nowrap"
+                    >
+                      {sub.name}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <Link
+                  href={`/category/${hoveredCategory}`}
+                  className="block px-lg py-[8px] text-[13px] text-ls-primary hover:bg-ls-surface rounded transition-colors"
+                >
+                  Browse all {catLabel.toLowerCase()}
+                </Link>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+
+    {/* Spacer to push content below the fixed header + category bar */}
+    <div className="h-[56px] md:h-[96px]" />
+    <div className="h-[52px] md:hidden" />
+    </>
   );
 }

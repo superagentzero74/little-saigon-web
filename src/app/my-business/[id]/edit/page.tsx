@@ -11,7 +11,9 @@ import {
   getBusinessById, updateBusiness, getBusinessPhotos,
   deleteBusinessPhoto, reorderBusinessPhotos, updateBusinessPhoto, uploadBusinessPhoto, getDishes,
 } from "@/lib/services";
-import type { BusinessPhoto, PhotoTag, MonVietDish } from "@/lib/types";
+import type { BusinessPhoto, PhotoTag, MonVietDish, StructuredHourSlot } from "@/lib/types";
+import StructuredHoursEditor from "@/components/ui/StructuredHoursEditor";
+import { parseStringHoursToStructured, structuredHoursToStringArray } from "@/lib/hours-utils";
 
 const PHOTO_TAGS: PhotoTag[] = ["outside", "inside", "food", "drinks", "menu", "other"];
 
@@ -26,6 +28,7 @@ interface FormState {
   website: string;
   description: string;
   hours: string;
+  structuredHours: StructuredHourSlot[];
   tags: string[];
 }
 
@@ -61,6 +64,11 @@ export default function OwnerEditBusinessPage() {
       website: biz.website || "",
       description: biz.description || "",
       hours: biz.hours?.join("\n") || "",
+      structuredHours: biz.structuredHours?.length
+        ? biz.structuredHours
+        : biz.hours?.length
+          ? parseStringHoursToStructured(biz.hours)
+          : [],
       tags: biz.tags || [],
     });
     setPhotos(pics);
@@ -136,12 +144,12 @@ export default function OwnerEditBusinessPage() {
     setSaving(true);
     setMsg(null);
     try {
-      const hoursArr = form.hours.split("\n").map((l) => l.trim()).filter(Boolean);
       await updateBusiness(businessId, {
         phone: form.phone || undefined,
         website: form.website || undefined,
         description: form.description || undefined,
-        hours: hoursArr.length > 0 ? hoursArr : undefined,
+        structuredHours: form.structuredHours,
+        hours: structuredHoursToStringArray(form.structuredHours),
         tags: form.tags,
       });
       setMsg({ text: "Saved successfully!" });
@@ -240,14 +248,10 @@ export default function OwnerEditBusinessPage() {
 
         {/* Hours */}
         <section>
-          <h2 className="text-[14px] font-semibold text-ls-primary mb-xs">Hours</h2>
-          <p className="text-[12px] text-ls-secondary mb-md">One line per day, e.g. "Monday: 10:00 AM – 9:00 PM"</p>
-          <textarea
-            value={form.hours}
-            onChange={(e) => set("hours", e.target.value)}
-            rows={8}
-            placeholder={"Monday: 10:00 AM – 9:00 PM\nTuesday: 10:00 AM – 9:00 PM"}
-            className="w-full border border-ls-border rounded-btn p-md text-[13px] font-mono focus:outline-none focus:border-ls-primary resize-none"
+          <h2 className="text-[14px] font-semibold text-ls-primary mb-md">Hours</h2>
+          <StructuredHoursEditor
+            value={form.structuredHours}
+            onChange={(slots) => setForm((f) => f ? { ...f, structuredHours: slots } : f)}
           />
         </section>
 

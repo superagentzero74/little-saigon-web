@@ -17,27 +17,27 @@ export default function DishCard({ dish, variant = "full" }: DishCardProps) {
     return (
       <Link
         href={`/guide/${slug}`}
-        className="flex-shrink-0 w-[100px] group text-center"
+        className="flex-shrink-0 w-[180px] group text-center"
       >
-        <div className="w-[80px] h-[80px] mx-auto rounded-card overflow-hidden bg-ls-surface border border-ls-border">
+        <div className="w-[160px] h-[160px] mx-auto rounded-card overflow-hidden bg-ls-surface border border-ls-border">
           {dish.photoURL ? (
             <Image
               src={dish.photoURL}
               alt={dish.name}
-              width={160}
-              height={160}
+              width={320}
+              height={320}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <UtensilsCrossed size={24} className="text-ls-secondary" />
+              <UtensilsCrossed size={36} className="text-ls-secondary" />
             </div>
           )}
         </div>
-        <p className="text-[11px] font-medium text-ls-primary mt-xs truncate px-xs">
+        <p className="text-[13px] font-medium text-ls-primary mt-xs truncate px-xs">
           {dish.name}
         </p>
-        <p className="text-[10px] text-ls-secondary truncate px-xs">
+        <p className="text-[11px] text-ls-secondary truncate px-xs">
           {dish.englishName}
         </p>
       </Link>
@@ -50,26 +50,19 @@ export default function DishCard({ dish, variant = "full" }: DishCardProps) {
       href={`/guide/${slug}`}
       className="ls-card flex items-center gap-lg group"
     >
-      {/* Rank number */}
-      <div className="w-[32px] text-center flex-shrink-0">
-        <span className="text-section-header text-ls-primary">
-          {dish.rank}
-        </span>
-      </div>
-
       {/* Thumbnail */}
-      <div className="w-[52px] h-[52px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
+      <div className="w-[208px] h-[208px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
         {dish.photoURL ? (
           <Image
             src={dish.photoURL}
             alt={dish.name}
-            width={104}
-            height={104}
+            width={416}
+            height={416}
             className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <UtensilsCrossed size={20} className="text-ls-secondary" />
+            <UtensilsCrossed size={48} className="text-ls-secondary" />
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import {
 import type { Business, CheckIn, Review } from "@/lib/types";
 import BusinessCard from "@/components/business/BusinessCard";
 import { Star, MapPin, Award, User, Heart, Camera, Pencil, Trash2 } from "lucide-react";
+import VietInput from "@/components/ui/VietInput";
 
 type Tab = "profile" | "reviews" | "checkins" | "saved";
 const TABS: { key: Tab; label: string }[] = [
@@ -298,24 +299,33 @@ export default function ProfilePage() {
             <h3 className="text-[15px] font-semibold text-ls-primary">Personal Info</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
               {[
-                { key: "firstName", label: "First Name", placeholder: "Nguyễn" },
-                { key: "lastName", label: "Last Name", placeholder: "Văn A" },
-                { key: "nickname", label: "Nickname", placeholder: "e.g. Foodie Nguyen" },
-                { key: "city", label: "City", placeholder: "Garden Grove" },
-                { key: "state", label: "State", placeholder: "CA" },
-                { key: "website", label: "Website / Social", placeholder: "@username or https://..." },
-              ].map(({ key, label, placeholder }) => (
+                { key: "firstName", label: "First Name", placeholder: "Nguyễn", viet: true },
+                { key: "lastName", label: "Last Name", placeholder: "Văn A", viet: true },
+                { key: "nickname", label: "Nickname", placeholder: "e.g. Foodie Nguyen", viet: true },
+                { key: "city", label: "City", placeholder: "Garden Grove", viet: false },
+                { key: "state", label: "State", placeholder: "CA", viet: false },
+                { key: "website", label: "Website / Social", placeholder: "@username or https://...", viet: false },
+              ].map(({ key, label, placeholder, viet }) => (
                 <div key={key} className={key === "website" ? "sm:col-span-2" : ""}>
                   <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
                     {label}
                   </label>
-                  <input
-                    type="text"
-                    value={(form as any)[key]}
-                    onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full bg-ls-surface rounded-btn px-md py-[10px] text-[14px] text-ls-primary outline-none focus:ring-2 focus:ring-ls-primary/20 placeholder:text-ls-secondary"
-                  />
+                  {viet ? (
+                    <VietInput
+                      value={(form as any)[key]}
+                      onChange={(v) => setForm((p) => ({ ...p, [key]: v }))}
+                      placeholder={placeholder}
+                      className="w-full bg-ls-surface rounded-btn px-md py-[10px] text-[14px] text-ls-primary outline-none focus:ring-2 focus:ring-ls-primary/20 placeholder:text-ls-secondary"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={(form as any)[key]}
+                      onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="w-full bg-ls-surface rounded-btn px-md py-[10px] text-[14px] text-ls-primary outline-none focus:ring-2 focus:ring-ls-primary/20 placeholder:text-ls-secondary"
+                    />
+                  )}
                 </div>
               ))}
               {/* Bio — full width */}
@@ -323,12 +333,12 @@ export default function ProfilePage() {
                 <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
                   Bio / About Me
                 </label>
-                <textarea
+                <VietInput
                   value={form.bio}
-                  onChange={(e) => setForm((p) => ({ ...p, bio: e.target.value }))}
+                  onChange={(v) => setForm((p) => ({ ...p, bio: v.slice(0, 300) }))}
                   placeholder="Tell the community a little about yourself…"
+                  multiline
                   rows={3}
-                  maxLength={300}
                   className="w-full bg-ls-surface rounded-btn px-md py-[10px] text-[14px] text-ls-primary outline-none focus:ring-2 focus:ring-ls-primary/20 placeholder:text-ls-secondary resize-none"
                 />
                 <p className="text-[11px] text-ls-secondary text-right mt-[2px]">{form.bio.length}/300</p>

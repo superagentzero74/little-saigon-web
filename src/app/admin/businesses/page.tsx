@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Search, Pencil, Check, X, ExternalLink, Plus, Trash2, Settings2 } from "lucide-react";
 import { getBusinesses, updateBusiness, searchBusinesses, deleteBusiness } from "@/lib/services";
-import type { Business, BusinessCategory } from "@/lib/types";
+import type { Business, BusinessCategory, LegacyBusinessCategory } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 
 const CATEGORY_OPTIONS = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
@@ -152,7 +152,7 @@ export default function AdminBusinessesPage() {
                         />
                       ) : (
                         <div>
-                          <p className="font-medium text-ls-primary">{biz.name}</p>
+                          <Link href={`/admin/businesses/${biz.id}/edit`} className="font-medium text-ls-primary hover:underline">{biz.name}</Link>
                           <p className="text-[11px] text-ls-secondary truncate max-w-[200px]">{biz.address}</p>
                         </div>
                       )}
@@ -161,7 +161,7 @@ export default function AdminBusinessesPage() {
                       {isEditing ? (
                         <select
                           value={editForm.category || biz.category}
-                          onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value as BusinessCategory }))}
+                          onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value as LegacyBusinessCategory }))}
                           className="border border-ls-border rounded px-sm py-xs text-[13px] focus:outline-none"
                         >
                           {CATEGORY_OPTIONS.map(([k, { label }]) => (

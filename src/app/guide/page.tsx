@@ -28,14 +28,11 @@ export default function GuidePage() {
     <div className="ls-container py-3xl">
       {/* Header */}
       <div className="mb-3xl">
-        <p className="text-meta text-ls-secondary uppercase tracking-widest mb-xs">
-          The Essential Guide
-        </p>
         <h1 className="text-page-title text-ls-primary">
-          Top 50 Món Việt
+          Food Guide
         </h1>
         <p className="text-body text-ls-body mt-sm max-w-2xl">
-          50 essential Vietnamese dishes every food lover should try. From classic
+          Popular Vietnamese dishes, drinks, and desserts. From classic
           phở to crispy bánh xèo — explore the flavors of Vietnam right here in
           Little Saigon.
         </p>
@@ -47,7 +44,7 @@ export default function GuidePage() {
           {[...Array(10)].map((_, i) => (
             <div key={i} className="ls-card flex items-center gap-lg animate-pulse">
               <div className="w-[32px] h-6 bg-ls-surface rounded" />
-              <div className="w-[52px] h-[52px] rounded-[8px] bg-ls-surface" />
+              <div className="w-[208px] h-[208px] rounded-[8px] bg-ls-surface" />
               <div className="flex-1">
                 <div className="h-4 bg-ls-surface rounded w-1/3" />
                 <div className="h-3 bg-ls-surface rounded w-1/4 mt-sm" />
@@ -56,7 +53,7 @@ export default function GuidePage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-sm">
           {dishes.map((dish) => (
             <DishCard key={dish.id} dish={dish} variant="full" />
           ))}

@@ -11,7 +11,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import type { MonVietDish, Business } from "@/lib/types";
 import { businessSlug } from "@/lib/utils";
-import { getDishes, searchBusinesses, toggleDishChecked, getUserProfile, getDishFeatured } from "@/lib/services";
+import { getDishes, searchBusinesses, toggleDishChecked, getUserProfile, getDishFeatured, getBusinessPhotos } from "@/lib/services";
 
 // ── Geo helpers ──────────────────────────────────────────────────────────────
 
@@ -50,6 +50,7 @@ export default function DishDetailPage() {
   const [message, setMessage] = useState("");
   const [sortBy, setSortBy] = useState<"rating" | "distance">("rating");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [bizThumbnails, setBizThumbnails] = useState<Record<string, string>>({});
 
   const mapRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<any[]>([]);
@@ -86,6 +87,19 @@ export default function DishDetailPage() {
           ]);
           setNearbyBusinesses(nearbyResults.slice(0, 8));
           setFeaturedBusinesses(featuredResults);
+          // Fetch subcollection photos for businesses without top-level photos
+          const allBiz = [...nearbyResults.slice(0, 8), ...featuredResults];
+          const needPhotos = allBiz.filter((b) => !b.photos?.length && b.id);
+          if (needPhotos.length > 0) {
+            const thumbMap: Record<string, string> = {};
+            await Promise.all(needPhotos.map(async (b) => {
+              try {
+                const subPhotos = await getBusinessPhotos(b.id);
+                if (subPhotos.length > 0) thumbMap[b.id] = subPhotos[0].url;
+              } catch {}
+            }));
+            setBizThumbnails(thumbMap);
+          }
           if (user) {
             const profile = await getUserProfile(user.id);
             setIsChecked(profile?.checkedDishes?.includes(found.rank) || false);
@@ -225,7 +239,7 @@ export default function DishDetailPage() {
   if (!dish) {
     return (
       <div className="ls-container py-3xl text-center">
-        <h1 className="text-page-title text-ls-primary">Dish Not Found</h1>
+        <h1 className="text-page-title text-ls-primary">Food Not Found</h1>
         <Link href="/guide" className="ls-btn inline-block mt-lg">Back to Top 50</Link>
       </div>
     );
@@ -235,11 +249,11 @@ export default function DishDetailPage() {
   const prevDish = currentIndex > 0 ? allDishes[currentIndex - 1] : null;
   const nextDish = currentIndex < allDishes.length - 1 ? allDishes[currentIndex + 1] : null;
 
-  const MEDALS = [
-    { bg: "bg-amber-400", label: "1st" },
-    { bg: "bg-slate-400", label: "2nd" },
-    { bg: "bg-amber-700", label: "3rd" },
-  ];
+  const MEDALS: Record<number, { bg: string; label: string }> = {
+    0: { bg: "bg-amber-400", label: "1st" },
+    1: { bg: "bg-slate-400", label: "2nd" },
+    2: { bg: "bg-amber-700", label: "3rd" },
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -326,7 +340,7 @@ export default function DishDetailPage() {
 
           {isChecked && (
             <p className="text-meta text-green-600 font-semibold mb-lg">
-              ✓ Bạn Đã Thử! You've tried this dish.
+              ✓ Bạn Đã Thử! You've tried this food.
             </p>
           )}
 
@@ -361,15 +375,24 @@ export default function DishDetailPage() {
               </div>
               <div className="space-y-sm">
                 {featuredBusinesses.map((biz, i) => {
-                  const medal = MEDALS[i] || MEDALS[2];
+                  const medal = MEDALS[i] || { bg: "bg-ls-primary", label: `#${i + 1}` };
                   return (
                     <Link
                       key={biz.id}
                       href={`/business/${businessSlug(biz)}`}
                       className="ls-card flex items-center gap-md group hover:shadow-md transition-shadow"
                     >
-                      <div className={`w-[32px] h-[32px] rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ${medal.bg}`}>
-                        {medal.label}
+                      <div className="relative w-[150px] h-[150px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
+                        {(biz.photos?.[0] || bizThumbnails[biz.id]) ? (
+                          <Image src={biz.photos?.[0] || bizThumbnails[biz.id]} alt={biz.name} width={300} height={300} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <MapPin size={28} className="text-ls-secondary" />
+                          </div>
+                        )}
+                        <div className={`absolute top-1.5 left-1.5 w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-bold text-white ${medal.bg}`}>
+                          {medal.label}
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[14px] font-semibold text-ls-primary truncate group-hover:underline">{biz.name}</p>
@@ -448,10 +471,16 @@ export default function DishDetailPage() {
                     <Link
                       key={biz.id}
                       href={`/business/${businessSlug(biz)}`}
-                      className="ls-card flex items-start gap-md group hover:shadow-md transition-shadow"
+                      className="ls-card flex items-center gap-md group hover:shadow-md transition-shadow"
                     >
-                      <div className="w-[22px] h-[22px] rounded-full bg-ls-primary text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-[3px]">
-                        {i + 1}
+                      <div className="w-[75px] h-[75px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
+                        {(biz.photos?.[0] || bizThumbnails[biz.id]) ? (
+                          <Image src={biz.photos?.[0] || bizThumbnails[biz.id]} alt={biz.name} width={150} height={150} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <MapPin size={20} className="text-ls-secondary" />
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[14px] font-semibold text-ls-primary truncate group-hover:underline">
@@ -473,7 +502,7 @@ export default function DishDetailPage() {
                         </div>
                         <p className="text-[12px] text-ls-secondary truncate mt-[2px]">{biz.address}</p>
                       </div>
-                      <ArrowRight size={15} className="text-ls-secondary flex-shrink-0 mt-1 group-hover:text-ls-primary transition-colors" />
+                      <ArrowRight size={15} className="text-ls-secondary flex-shrink-0 group-hover:text-ls-primary transition-colors" />
                     </Link>
                   );
                 })}

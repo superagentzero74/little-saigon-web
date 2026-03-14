@@ -50,28 +50,12 @@ export default function CategoryPage() {
     <div className="ls-container py-3xl">
       {/* Header */}
       <div className="mb-2xl">
-        <span className="text-[36px]">{catInfo.icon}</span>
-        <h1 className="text-page-title text-ls-primary mt-sm">
+        <h1 className="text-page-title text-ls-primary">
           {catInfo.label}
         </h1>
         <p className="text-body text-ls-secondary mt-xs">
           {loading ? "Loading..." : `${businesses.length} businesses in Little Saigon`}
         </p>
-      </div>
-
-      {/* Other categories */}
-      <div className="flex gap-sm overflow-x-auto pb-lg mb-2xl scrollbar-hide">
-        {(Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][]).map(
-          ([key, info]) => (
-            <Link
-              key={key}
-              href={`/category/${key}`}
-              className={key === category ? "ls-pill-active whitespace-nowrap" : "ls-pill whitespace-nowrap"}
-            >
-              {info.icon} {info.label}
-            </Link>
-          )
-        )}
       </div>
 
       {/* Results */}

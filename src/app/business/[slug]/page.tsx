@@ -1,196 +1,204 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import {
-  MapPin, Phone, Globe, Clock, ChevronLeft, ChevronRight, Navigation,
-  Star, Heart, Camera, CheckCircle, X, Pencil, Building2,
-} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "@/contexts/LocationContext";
-import type { Business, Review, BusinessPhoto, PhotoTag } from "@/lib/types";
-import { CATEGORIES } from "@/lib/types";
 import {
-  getBusinessById, getReviewsForBusiness, getBusinessPhotos,
-  submitReview, updateReview, getUserReviewForBusiness, checkIn, toggleFavorite,
-  uploadBusinessPhoto, getUserFavorites, getUserClaimForBusiness, submitClaimRequest,
+  getBusinessById, getBusinessPhotos, getReviewsForBusiness,
+  checkIn, submitReview, toggleFavorite,
 } from "@/lib/services";
-import { isCurrentlyOpen, formatPriceLevel, getDirectionsUrl } from "@/lib/utils";
-import StarRating from "@/components/ui/StarRating";
-import OpenStatus from "@/components/ui/OpenStatus";
+import type { Business, BusinessPhoto, Review, PhotoTag } from "@/lib/types";
+import { isCurrentlyOpen } from "@/lib/utils";
+import {
+  MapPin, Phone, Globe, Clock, Star, ChevronLeft, Heart,
+  Navigation, Camera, MessageSquare, CheckCircle, X,
+  UtensilsCrossed, BookOpen, TreePine, Home, GlassWater, LayoutGrid,
+} from "lucide-react";
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function formatHours(hours?: string[]): { day: string; time: string }[] {
+  if (!hours || hours.length === 0) return [];
+  return hours.map((h) => {
+    const parts = h.split(": ");
+    return { day: parts[0] || "", time: parts.slice(1).join(": ") || h };
+  });
+}
+
+function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
+  return (
+    <div className="flex items-center gap-[1px]">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          size={size}
+          className={i <= Math.round(rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-200"}
+        />
+      ))}
+    </div>
+  );
+}
+
+function InteractiveStarRating({ rating, onChange }: { rating: number; onChange: (r: number) => void }) {
+  return (
+    <div className="flex items-center gap-xs">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <button key={i} onClick={() => onChange(i)} type="button">
+          <Star
+            size={28}
+            className={i <= rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function BusinessDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
   const { user, refreshProfile } = useAuth();
-  const { requestLocation } = useLocation();
 
   const [business, setBusiness] = useState<Business | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [photos, setPhotos] = useState<BusinessPhoto[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoTagFilter, setPhotoTagFilter] = useState<PhotoTag | null>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const [showHours, setShowHours] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // Interactive state
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewText, setReviewText] = useState("");
-  const [reviewHover, setReviewHover] = useState(0);
-  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
-  const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
-  const [submittingReview, setSubmittingReview] = useState(false);
+  // Check-in
   const [checkingIn, setCheckingIn] = useState(false);
-  const [checkInSuccess, setCheckInSuccess] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [message, setMessage] = useState("");
-  const [photoFilter, setPhotoFilter] = useState<PhotoTag | "all">("all");
-  const [claimStatus, setClaimStatus] = useState<"none" | "pending" | "approved" | "denied">("none");
-  const [showClaimModal, setShowClaimModal] = useState(false);
-  const [claimNote, setClaimNote] = useState("");
-  const [submittingClaim, setSubmittingClaim] = useState(false);
+  const [checkInMsg, setCheckInMsg] = useState("");
+
+  // Review
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewMsg, setReviewMsg] = useState("");
 
   const loadData = useCallback(async () => {
     try {
-      // Slug format: "{nameSlug}--{fullFirestoreId}"
       const businessId = slug.includes("--") ? slug.split("--").slice(1).join("--") : slug.slice(-8);
       const biz = await getBusinessById(businessId);
+      if (!biz) { setLoading(false); return; }
+      setBusiness(biz);
 
-      if (biz) {
-        setBusiness(biz);
-
-        const [revResult, picResult] = await Promise.allSettled([
-          getReviewsForBusiness(biz.id),
-          getBusinessPhotos(biz.id),
-        ]);
-        if (revResult.status === "fulfilled") setReviews(revResult.value);
-        if (picResult.status === "fulfilled") setPhotos(picResult.value);
-
-        if (user) {
-          const [existingReview, favs, claimReq] = await Promise.all([
-            getUserReviewForBusiness(biz.id, user.id),
-            getUserFavorites(user.id),
-            user.role !== "admin" ? getUserClaimForBusiness(biz.id, user.id) : Promise.resolve(null),
-          ]);
-          if (existingReview) {
-            setAlreadyReviewed(true);
-            setExistingReviewId(existingReview.id);
-            setReviewRating(existingReview.rating);
-            setReviewText(existingReview.text || "");
-          }
-          setIsFavorited(favs.includes(biz.id));
-          if (claimReq) setClaimStatus(claimReq.status);
-        }
-      }
+      const [p, r] = await Promise.all([
+        getBusinessPhotos(biz.id).catch(() => []),
+        getReviewsForBusiness(biz.id).catch(() => []),
+      ]);
+      setPhotos(p);
+      setReviews(r);
     } catch (err) {
       console.error("Failed to load business:", err);
     } finally {
       setLoading(false);
     }
-  }, [slug, user]);
+  }, [slug]);
 
-  useEffect(() => { window.scrollTo(0, 0); loadData(); }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // Handlers
-  const handleFavorite = async () => {
-    if (!user) { router.push("/login"); return; }
-    if (!business) return;
-    const newState = await toggleFavorite(user.id, business.id);
-    setIsFavorited(newState);
-    await refreshProfile();
-  };
+  useEffect(() => {
+    if (user && business) {
+      setIsFavorite(user.favorites?.includes(business.id) || false);
+    }
+  }, [user, business]);
+
+  // Reset gallery scroll when tag filter changes
+  useEffect(() => {
+    galleryRef.current?.scrollTo({ left: 0 });
+  }, [photoTagFilter]);
+
+  // Build tagged photo list: subcollection photos have tags, business.photos are untagged
+  const taggedPhotos: { url: string; tag: PhotoTag | null }[] = [
+    ...(business?.photos || []).map((url) => ({ url, tag: null as PhotoTag | null })),
+    ...photos.map((p) => ({ url: p.url, tag: p.tag })),
+  ].filter((p) => Boolean(p.url));
+
+  // Available tags from subcollection photos
+  const availableTags = Array.from(new Set(photos.map((p) => p.tag).filter(Boolean))) as PhotoTag[];
+
+  // Filtered photos based on selected tag
+  const filteredPhotos = photoTagFilter
+    ? taggedPhotos.filter((p) => p.tag === photoTagFilter)
+    : taggedPhotos;
+  const allPhotoUrls = filteredPhotos.map((p) => p.url);
 
   const handleCheckIn = async () => {
     if (!user) { router.push("/login"); return; }
     if (!business) return;
     setCheckingIn(true);
-    setMessage("");
+    setCheckInMsg("");
     try {
-      const { lat, lng } = await requestLocation();
-      await checkIn(business.id, lat, lng);
-      setCheckInSuccess(true);
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      );
+      await checkIn(business.id, pos.coords.latitude, pos.coords.longitude);
       await refreshProfile();
-      setTimeout(() => setCheckInSuccess(false), 3000);
+      setCheckInMsg("Checked in! +10 Đồng");
+      setTimeout(() => setCheckInMsg(""), 3000);
     } catch (err: any) {
-      setMessage(err.message || "Check-in failed");
+      setCheckInMsg(err.message || "Check-in failed");
     } finally {
       setCheckingIn(false);
     }
   };
 
-  const handleSubmitReview = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleToggleFavorite = async () => {
     if (!user) { router.push("/login"); return; }
-    if (!business || reviewRating === 0) return;
+    if (!business) return;
+    const saved = await toggleFavorite(user.id, business.id);
+    setIsFavorite(saved);
+    await refreshProfile();
+  };
+
+  const handleSubmitReview = async () => {
+    if (!user) { router.push("/login"); return; }
+    if (!business || !reviewText.trim()) return;
     setSubmittingReview(true);
+    setReviewMsg("");
     try {
-      if (existingReviewId) {
-        // Edit existing review
-        await updateReview(existingReviewId, reviewRating, reviewText);
-        setReviews(reviews.map((r) =>
-          r.id === existingReviewId ? { ...r, rating: reviewRating, text: reviewText } : r
-        ));
-        setMessage("Review updated!");
-      } else {
-        // New review
-        const newReview = await submitReview(business.id, reviewRating, reviewText);
-        setReviews([{ ...newReview, createdAt: new Date() } as any, ...reviews]);
-        setExistingReviewId(newReview.id);
-        setAlreadyReviewed(true);
-        setMessage("+25 Đồng earned!");
-        await refreshProfile();
-      }
+      await submitReview(business.id, reviewRating, reviewText.trim());
+      await refreshProfile();
       setShowReviewForm(false);
-      setTimeout(() => setMessage(""), 3000);
+      setReviewText("");
+      setReviewRating(5);
+      setReviewMsg("Review submitted! +25 Đồng");
+      const r = await getReviewsForBusiness(business.id);
+      setReviews(r);
+      setTimeout(() => setReviewMsg(""), 3000);
     } catch (err: any) {
-      setMessage(err.message || "Failed to submit review");
+      setReviewMsg(err.message || "Failed to submit review");
     } finally {
       setSubmittingReview(false);
     }
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user) { router.push("/login"); return; }
-    if (!business || !e.target.files?.[0]) return;
-    setUploadingPhoto(true);
-    try {
-      const newPhoto = await uploadBusinessPhoto(business.id, e.target.files[0], "other");
-      setPhotos([newPhoto, ...photos]);
-      setMessage("+15 Đồng earned!");
-      await refreshProfile();
-      setTimeout(() => setMessage(""), 3000);
-    } catch (err: any) {
-      setMessage(err.message || "Upload failed");
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
+  const todayHours = (() => {
+    if (!business?.hours || business.hours.length === 0) return null;
+    const today = DAYS[new Date().getDay()];
+    const entry = business.hours.find((h) => h.startsWith(today));
+    return entry ? entry.split(": ").slice(1).join(": ") : null;
+  })();
 
-  const handleClaimSubmit = async () => {
-    if (!user || !business) return;
-    setSubmittingClaim(true);
-    try {
-      await submitClaimRequest(business.id, business.name, claimNote);
-      setClaimStatus("pending");
-      setShowClaimModal(false);
-      setClaimNote("");
-    } catch (err: any) {
-      alert(err.message || "Failed to submit claim.");
-    } finally {
-      setSubmittingClaim(false);
-    }
-  };
+  const directionsUrl = business
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(business.address)}`
+    : "#";
 
   if (loading) {
     return (
-      <div className="ls-container py-3xl">
+      <div className="ls-container py-3xl max-w-3xl mx-auto">
         <div className="animate-pulse">
-          <div className="h-[300px] bg-ls-surface rounded-card mb-2xl" />
-          <div className="h-8 bg-ls-surface rounded w-1/2 mb-md" />
-          <div className="h-4 bg-ls-surface rounded w-1/3" />
+          <div className="h-[300px] bg-ls-surface rounded-card" />
+          <div className="h-8 bg-ls-surface rounded w-2/3 mt-xl" />
+          <div className="h-4 bg-ls-surface rounded w-1/2 mt-md" />
         </div>
       </div>
     );
@@ -205,387 +213,417 @@ export default function BusinessDetailPage() {
     );
   }
 
-  const openStatus = isCurrentlyOpen(business.hours);
-  const catInfo = CATEGORIES[business.category];
-  const allPhotos = [
-    ...(business.photos || []).map((url, i) => ({ url, id: `main-${i}`, tag: "other" as PhotoTag })),
-    ...photos.map((p) => ({ url: p.url, id: p.id, tag: p.tag })),
-  ];
-  const filteredPhotos = photoFilter === "all" ? allPhotos : allPhotos.filter((p) => p.tag === photoFilter);
-  const displayPhotos = filteredPhotos.length > 0 ? filteredPhotos : allPhotos;
-
   return (
-    <div>
-      {/* Floating edit button for admin or business owner */}
-      {business && (user?.role === "admin" || (user?.role === "business_owner" && business.ownerId === user.id)) && (
-        <Link
-          href={user?.role === "admin" ? `/admin/businesses/${business.id}/edit` : `/my-business/${business.id}/edit`}
-          className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-ls-primary text-white flex items-center gap-xs pl-sm pr-md py-sm rounded-r-btn shadow-lg hover:bg-ls-primary/90 transition-colors"
-        >
-          <Pencil size={13} />
-          <span className="text-[12px] font-semibold">Edit</span>
-        </Link>
-      )}
-
-      {/* Claim modal */}
-      {showClaimModal && (
-        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-xl">
-          <div className="bg-white rounded-card p-2xl max-w-md w-full shadow-xl">
-            <div className="flex items-center justify-between mb-lg">
-              <h2 className="text-[16px] font-bold text-ls-primary">Claim This Business</h2>
-              <button onClick={() => setShowClaimModal(false)}><X size={18} className="text-ls-secondary" /></button>
-            </div>
-            <p className="text-[13px] text-ls-body mb-lg">
-              Submit a claim to become the owner of <strong>{business?.name}</strong>. An admin will review and approve your request.
-            </p>
-            <textarea
-              value={claimNote}
-              onChange={(e) => setClaimNote(e.target.value.slice(0, 300))}
-              placeholder="Optional: explain your connection to this business (e.g. I am the owner)..."
-              rows={3}
-              className="w-full border border-ls-border rounded-btn p-md text-[13px] text-ls-primary outline-none resize-none placeholder:text-ls-secondary mb-sm"
-            />
-            <p className="text-[11px] text-ls-secondary mb-lg">{claimNote.length}/300</p>
-            <div className="flex gap-md justify-end">
-              <button
-                onClick={() => setShowClaimModal(false)}
-                className="ls-btn-secondary text-[13px] py-sm px-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClaimSubmit}
-                disabled={submittingClaim}
-                className="ls-btn text-[13px] py-sm px-lg disabled:opacity-50"
-              >
-                {submittingClaim ? "Submitting..." : "Submit Claim"}
-              </button>
-            </div>
+    <div className="pb-3xl">
+      {/* Lightbox */}
+      {lightboxIndex !== null && (
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center" onClick={() => setLightboxIndex(null)}>
+          <button className="absolute top-4 right-4 text-white z-10 p-2" onClick={() => setLightboxIndex(null)}>
+            <X size={28} />
+          </button>
+          {lightboxIndex > 0 && (
+            <button
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white z-10 bg-black/40 rounded-full p-2"
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1); }}
+            >
+              <ChevronLeft size={28} />
+            </button>
+          )}
+          {lightboxIndex < allPhotoUrls.length - 1 && (
+            <button
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/80 hover:text-white z-10 bg-black/40 rounded-full p-2"
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1); }}
+            >
+              <ChevronLeft size={28} className="rotate-180" />
+            </button>
+          )}
+          <img
+            src={allPhotoUrls[lightboxIndex]}
+            alt=""
+            className="max-h-[90vh] max-w-[95vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+            {lightboxIndex + 1} / {allPhotoUrls.length}
           </div>
         </div>
       )}
 
-      {/* Check-in success overlay */}
-      {checkInSuccess && (
-        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center">
-          <div className="bg-white rounded-card p-3xl text-center max-w-sm mx-xl animate-[scaleIn_0.3s_ease]">
-            <CheckCircle size={48} className="text-green-600 mx-auto" />
-            <h2 className="text-[22px] font-bold text-ls-primary mt-md">Checked In!</h2>
-            <p className="text-body text-ls-secondary mt-xs">+10 points earned at {business.name}</p>
-            <button onClick={() => setCheckInSuccess(false)} className="ls-btn mt-lg">Nice!</button>
-          </div>
-        </div>
-      )}
+      {/* Photo Gallery — Yelp-style full-width */}
+      {allPhotoUrls.length > 0 ? (
+        <div>
+          <div className="relative w-full overflow-hidden" style={{ height: "425px" }}>
+            <div
+              ref={galleryRef}
+              className="flex h-full overflow-x-auto"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+            >
+              {allPhotoUrls.map((url, i) => (
+                <button
+                  key={`${photoTagFilter}-${i}`}
+                  onClick={() => setLightboxIndex(i)}
+                  className="flex-shrink-0 h-full cursor-pointer border-none p-0"
+                  style={{ marginRight: allPhotoUrls.length > 1 ? "2px" : 0 }}
+                >
+                  <img
+                    src={url}
+                    alt={`${business.name} photo ${i + 1}`}
+                    className="h-full object-cover"
+                    style={{ minWidth: allPhotoUrls.length === 1 ? "100vw" : "auto", maxWidth: "80vw" }}
+                  />
+                </button>
+              ))}
+            </div>
 
-      {/* Photo Strip */}
-      {displayPhotos.length > 0 && (
-        <div className="relative bg-black">
-          <div className="flex h-[260px] md:h-[380px] overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-            {displayPhotos.map((photo, i) => (
-              <div
-                key={photo.id}
-                className="relative flex-shrink-0 snap-start cursor-pointer"
-                style={{ width: displayPhotos.length === 1 ? "100%" : "calc(100% - 60px)", maxWidth: 700 }}
-                onClick={() => setPhotoIndex(i)}
-              >
-                <Image
-                  src={photo.url}
-                  alt={`${business.name} photo ${i + 1}`}
-                  fill
-                  className="object-cover"
-                  priority={i === 0}
-                />
-                {/* Gap between photos */}
-                <div className="absolute inset-y-0 right-0 w-[3px] bg-black" />
+            {/* Back button */}
+            <button
+              onClick={() => router.back()}
+              className="absolute top-4 left-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 z-10"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            {/* Favorite button */}
+            <button
+              onClick={handleToggleFavorite}
+              className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 z-10"
+              title={isFavorite ? "Remove from favorites" : "Save to favorites"}
+            >
+              <Heart size={20} className={isFavorite ? "text-red-500 fill-red-500" : "text-white"} />
+            </button>
+
+            {/* Dark gradient overlay with business info */}
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 40%, transparent 65%)" }} />
+            <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">
+              <div className="max-w-3xl mx-auto">
+                <h1 className="text-[56px] font-bold text-white leading-tight drop-shadow-lg">{business.name}</h1>
+                <div className="flex items-center gap-[6px] mt-[6px] flex-wrap">
+                  <div className="flex items-center gap-[2px]">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Star
+                        key={i}
+                        size={16}
+                        className={i <= Math.round(business.rating) ? "text-yellow-400 fill-yellow-400" : "text-white/40"}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-white font-semibold text-[14px]">{business.rating?.toFixed(1)}</span>
+                  <span className="text-white/70 text-[13px]">({business.totalRatings} reviews)</span>
+                </div>
+                <div className="flex items-center gap-[6px] mt-[4px] text-[13px] flex-wrap">
+                  {business.priceLevel && (
+                    <>
+                      <span className="text-white/80">{"$".repeat(business.priceLevel)}</span>
+                      <span className="text-white/40">·</span>
+                    </>
+                  )}
+                  <span className="text-white/80 capitalize">{business.category?.replace(/_/g, " ")}</span>
+                </div>
+                <div className="flex items-center gap-[6px] mt-[5px] text-[13px]">
+                  {isCurrentlyOpen(business.hours, business.structuredHours) ? (
+                    <span className="text-green-400 font-semibold">Open</span>
+                  ) : (
+                    <span className="text-red-400 font-semibold">Closed</span>
+                  )}
+                  {todayHours && (
+                    <>
+                      <span className="text-white/40">·</span>
+                      <span className="text-white/70">{todayHours}</span>
+                    </>
+                  )}
+                  {business.hours && business.hours.length > 0 && (
+                    <button
+                      className="text-white/60 hover:text-white/90 underline pointer-events-auto text-[12px] ml-[2px]"
+                      onClick={() => setShowHours(!showHours)}
+                    >
+                      See hours
+                    </button>
+                  )}
+                </div>
               </div>
-            ))}
+            </div>
+
+            {/* Photo counter */}
+            <div className="absolute bottom-5 right-5 bg-black/60 text-white text-[12px] font-medium px-3 py-[5px] rounded-full cursor-pointer hover:bg-black/80"
+              onClick={() => setLightboxIndex(0)}
+            >
+              <Camera size={13} className="inline mr-[4px] -mt-[1px]" />
+              See all {allPhotoUrls.length} photos
+            </div>
           </div>
-          {/* Photo count badge */}
-          <div className="absolute bottom-md left-md bg-black/60 text-white text-tag px-md py-xs rounded-badge">
-            {displayPhotos.length} {displayPhotos.length === 1 ? "photo" : "photos"}
+
+          {/* Photo tag filter buttons */}
+          {availableTags.length > 0 && (
+            <div className="flex gap-sm px-lg py-sm overflow-x-auto max-w-3xl mx-auto" style={{ scrollbarWidth: "none" }}>
+              <button
+                onClick={() => { setPhotoTagFilter(null); setPhotoIndex(0); }}
+                className={`flex items-center gap-[4px] text-[12px] font-medium px-md py-[6px] rounded-full whitespace-nowrap transition-colors ${
+                  photoTagFilter === null ? "bg-ls-primary text-white" : "bg-ls-surface text-ls-primary"
+                }`}
+              >
+                <LayoutGrid size={13} /> All
+              </button>
+              {(["food", "drinks", "menu", "inside", "outside", "other"] as PhotoTag[])
+                .filter((t) => availableTags.includes(t))
+                .map((tag) => {
+                  const tagConfig: Record<PhotoTag, { label: string; icon: React.ReactNode }> = {
+                    food: { label: "Food", icon: <UtensilsCrossed size={13} /> },
+                    drinks: { label: "Drinks", icon: <GlassWater size={13} /> },
+                    menu: { label: "Menu", icon: <BookOpen size={13} /> },
+                    inside: { label: "Inside", icon: <Home size={13} /> },
+                    outside: { label: "Outside", icon: <TreePine size={13} /> },
+                    other: { label: "Other", icon: <Camera size={13} /> },
+                  };
+                  const cfg = tagConfig[tag];
+                  const count = taggedPhotos.filter((p) => p.tag === tag).length;
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => { setPhotoTagFilter(photoTagFilter === tag ? null : tag); setPhotoIndex(0); }}
+                      className={`flex items-center gap-[4px] text-[12px] font-medium px-md py-[6px] rounded-full whitespace-nowrap transition-colors ${
+                        photoTagFilter === tag ? "bg-ls-primary text-white" : "bg-ls-surface text-ls-primary"
+                      }`}
+                    >
+                      {cfg.icon} {cfg.label} ({count})
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="relative w-full h-[250px] bg-ls-surface flex items-center justify-center">
+          <Camera size={40} className="text-ls-secondary" />
+          <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/60 to-transparent">
+            <div className="max-w-3xl mx-auto">
+              <h1 className="text-[26px] font-bold text-white">{business.name}</h1>
+              <p className="text-[13px] text-white/70 capitalize mt-[2px]">{business.category?.replace(/_/g, " ")}</p>
+            </div>
           </div>
-          {/* Favorite button */}
           <button
-            onClick={handleFavorite}
-            className="absolute top-md right-md w-[40px] h-[40px] bg-white/90 rounded-full flex items-center justify-center"
+            onClick={() => router.back()}
+            className="absolute top-4 left-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 z-10"
           >
-            <Heart size={20} className={isFavorited ? "fill-ls-heart text-ls-heart" : "text-ls-primary"} />
+            <ChevronLeft size={20} />
           </button>
         </div>
       )}
 
-      {/* Photo filter tabs */}
-      {photos.length > 0 && (
-        <div className="ls-container mt-md">
-          <div className="flex gap-sm overflow-x-auto scrollbar-hide">
-            {(["all", "food", "drinks", "inside", "menu", "outside"] as const).map((tag) => (
-              <button
-                key={tag}
-                onClick={() => { setPhotoFilter(tag); setPhotoIndex(0); }}
-                className={photoFilter === tag ? "ls-pill-active" : "ls-pill"}
-              >
-                {tag === "all" ? "All" : tag.charAt(0).toUpperCase() + tag.slice(1)}
-              </button>
-            ))}
-          </div>
+      <div className="ls-container max-w-3xl mx-auto">
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-sm mt-md">
+          <button
+            onClick={handleCheckIn}
+            disabled={checkingIn}
+            className="flex items-center gap-xs bg-ls-primary text-white text-[13px] font-medium px-lg py-sm rounded-btn hover:opacity-90 disabled:opacity-50"
+          >
+            <CheckCircle size={16} /> {checkingIn ? "Checking in..." : "Check In"}
+          </button>
+          <a
+            href={directionsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-xs bg-ls-surface text-ls-primary text-[13px] font-medium px-lg py-sm rounded-btn hover:bg-ls-border"
+          >
+            <Navigation size={16} /> Directions
+          </a>
+          <button
+            onClick={() => user ? setShowReviewForm(true) : router.push("/login")}
+            className="flex items-center gap-xs bg-ls-surface text-ls-primary text-[13px] font-medium px-lg py-sm rounded-btn hover:bg-ls-border"
+          >
+            <MessageSquare size={16} /> Review
+          </button>
         </div>
-      )}
 
-      <div className="ls-container py-2xl">
-        {message && (
-          <div className="mb-lg p-md bg-green-50 border border-green-200 rounded-btn text-[13px] text-green-700">
-            {message}
+        {(checkInMsg || reviewMsg) && (
+          <p className={`text-[13px] mt-sm ${(checkInMsg || reviewMsg).includes("failed") || (checkInMsg || reviewMsg).includes("Failed") ? "text-red-600" : "text-green-600"}`}>
+            {checkInMsg || reviewMsg}
+          </p>
+        )}
+
+        {/* Description */}
+        {business.description && (
+          <p className="text-[14px] text-ls-body mt-md leading-relaxed">{business.description}</p>
+        )}
+
+        {/* Info Section */}
+        <div className="mt-xl space-y-md">
+          {/* Address */}
+          <div className="flex items-start gap-md">
+            <MapPin size={18} className="text-ls-secondary shrink-0 mt-[2px]" />
+            <a
+              href={directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[14px] text-ls-primary hover:underline"
+            >
+              {business.address}
+            </a>
+          </div>
+
+          {/* Phone */}
+          {business.phone && (
+            <div className="flex items-center gap-md">
+              <Phone size={18} className="text-ls-secondary shrink-0" />
+              <a href={`tel:${business.phone}`} className="text-[14px] text-ls-primary hover:underline">
+                {business.phone}
+              </a>
+            </div>
+          )}
+
+          {/* Website */}
+          {business.website && (
+            <div className="flex items-center gap-md">
+              <Globe size={18} className="text-ls-secondary shrink-0" />
+              <a
+                href={business.website.startsWith("http") ? business.website : `https://${business.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[14px] text-ls-primary hover:underline truncate"
+              >
+                {business.website.replace(/^https?:\/\//, "")}
+              </a>
+            </div>
+          )}
+
+          {/* Hours */}
+          {business.hours && business.hours.length > 0 && (
+            <div className="flex items-start gap-md">
+              <Clock size={18} className="text-ls-secondary shrink-0 mt-[2px]" />
+              <div>
+                <button
+                  onClick={() => setShowHours(!showHours)}
+                  className="text-[14px] text-ls-primary hover:underline flex items-center gap-xs"
+                >
+                  {todayHours || "See hours"}
+                  <span className="text-[11px] text-ls-secondary">{showHours ? "▲" : "▼"}</span>
+                </button>
+                {showHours && (
+                  <div className="mt-sm space-y-[2px]">
+                    {formatHours(business.hours).map((h, i) => (
+                      <div key={i} className="flex gap-md text-[13px]">
+                        <span className="text-ls-secondary w-[90px]">{h.day}</span>
+                        <span className="text-ls-primary">{h.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Map */}
+        {business.latitude && business.longitude && (
+          <div className="mt-xl rounded-card overflow-hidden border border-ls-border">
+            <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
+              <iframe
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${business.longitude - 0.008},${business.latitude - 0.005},${business.longitude + 0.008},${business.latitude + 0.005}&layer=mapnik&marker=${business.latitude},${business.longitude}`}
+                width="100%"
+                height="200"
+                style={{ border: 0, pointerEvents: "none" }}
+                loading="lazy"
+              />
+            </a>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2xl">
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-sm mb-xs">
-              <span className="ls-tag">{catInfo?.label || business.category}</span>
-              <OpenStatus isOpen={openStatus} />
-              {business.priceLevel && <span className="text-meta text-ls-secondary">{formatPriceLevel(business.priceLevel)}</span>}
-            </div>
-            <h1 className="text-[28px] md:text-[32px] font-bold text-ls-primary">{business.name}</h1>
-            <div className="mt-sm"><StarRating rating={business.rating} totalRatings={business.totalRatings} size={16} /></div>
-
-            {business.description && (
-              <p className="text-body text-ls-body leading-relaxed mt-2xl">{business.description}</p>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-md mt-2xl">
-              <button
-                onClick={handleCheckIn}
-                disabled={checkingIn}
-                className="ls-btn flex items-center gap-sm disabled:opacity-50"
-              >
-                <MapPin size={16} />
-                {checkingIn ? "Checking in..." : "Check In (+10 Đồng)"}
-              </button>
-              <a href={getDirectionsUrl(business)} target="_blank" rel="noopener noreferrer"
-                className="ls-btn-secondary flex items-center gap-sm">
-                <Navigation size={16} /> Directions
-              </a>
-              {business.phone && (
-                <a href={`tel:${business.phone}`} className="ls-btn-secondary flex items-center gap-sm">
-                  <Phone size={16} /> Call
-                </a>
-              )}
-              {business.website && (
-                <a href={business.website} target="_blank" rel="noopener noreferrer"
-                  className="ls-btn-secondary flex items-center gap-sm">
-                  <Globe size={16} /> Website
-                </a>
-              )}
-              {/* Photo Upload */}
-              <label className="ls-btn-secondary flex items-center gap-sm cursor-pointer">
-                <Camera size={16} />
-                {uploadingPhoto ? "Uploading..." : "Add Photo (+15 Đồng)"}
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={uploadingPhoto} />
-              </label>
-            </div>
-
-            {/* Reviews */}
-            <div className="mt-3xl">
-              <div className="flex items-center justify-between mb-lg">
-                <h2 className="text-section-header text-ls-primary">
-                  Reviews
-                  {reviews.length > 0 && <span className="text-meta text-ls-secondary font-normal ml-sm">({reviews.length})</span>}
-                </h2>
-                {!showReviewForm && (
-                  <button
-                    onClick={() => user ? setShowReviewForm(true) : router.push("/login")}
-                    className="ls-btn text-[13px] py-sm px-lg"
-                  >
-                    {alreadyReviewed ? "Edit Review" : "Write Review (+25 Đồng)"}
-                  </button>
-                )}
+        {/* Write Review Modal */}
+        {showReviewForm && (
+          <>
+            <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowReviewForm(false)} />
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[440px] bg-white rounded-card shadow-xl z-50">
+              <div className="flex items-center justify-between px-lg py-md border-b border-ls-border">
+                <h2 className="text-[16px] font-bold text-ls-primary">Write a Review</h2>
+                <button onClick={() => setShowReviewForm(false)} className="p-xs text-ls-secondary hover:text-ls-primary">
+                  <X size={20} />
+                </button>
               </div>
-
-              {/* Write Review Form */}
-              {showReviewForm && (
-                <form onSubmit={handleSubmitReview} className="ls-card mb-lg">
-                  <div className="flex items-center justify-between mb-md">
-                    <h3 className="text-[14px] font-semibold text-ls-primary">{existingReviewId ? "Edit Your Review" : "Your Review"}</h3>
-                    <button type="button" onClick={() => setShowReviewForm(false)}><X size={18} className="text-ls-secondary" /></button>
-                  </div>
-
-                  {/* Star picker */}
-                  <div className="flex gap-xs mb-md">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onMouseEnter={() => setReviewHover(s)}
-                        onMouseLeave={() => setReviewHover(0)}
-                        onClick={() => setReviewRating(s)}
-                      >
-                        <Star
-                          size={28}
-                          className={
-                            s <= (reviewHover || reviewRating)
-                              ? "fill-ls-primary text-ls-primary"
-                              : "fill-none text-[#D1D1D1]"
-                          }
-                        />
-                      </button>
-                    ))}
-                    {reviewRating > 0 && (
-                      <span className="text-meta text-ls-secondary ml-sm self-center">
-                        {reviewRating}/5
-                      </span>
-                    )}
-                  </div>
-
+              <div className="p-lg space-y-md">
+                <div>
+                  <p className="text-[12px] font-semibold text-ls-secondary mb-xs">Rating</p>
+                  <InteractiveStarRating rating={reviewRating} onChange={setReviewRating} />
+                </div>
+                <div>
+                  <p className="text-[12px] font-semibold text-ls-secondary mb-xs">Your Review</p>
                   <textarea
                     value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value.slice(0, 500))}
+                    onChange={(e) => setReviewText(e.target.value)}
                     placeholder="Share your experience..."
                     rows={4}
-                    className="w-full bg-ls-surface rounded-btn p-md text-[14px] text-ls-primary outline-none resize-none placeholder:text-ls-secondary"
+                    className="w-full bg-white border border-ls-border rounded-btn px-md py-[10px] text-[14px] text-ls-primary outline-none focus:border-ls-primary placeholder:text-ls-secondary"
                   />
-                  <div className="flex items-center justify-between mt-md">
-                    <span className="text-tag text-ls-secondary">{reviewText.length}/500</span>
-                    <button
-                      type="submit"
-                      disabled={reviewRating === 0 || submittingReview}
-                      className="ls-btn text-[13px] py-sm px-lg disabled:opacity-50"
-                    >
-                      {submittingReview ? "Saving..." : existingReviewId ? "Update Review" : "Submit Review"}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {reviews.length === 0 && !showReviewForm ? (
-                <div className="ls-card text-center py-2xl">
-                  <p className="text-body text-ls-secondary">No reviews yet. Be the first!</p>
                 </div>
-              ) : (
-                <div className="space-y-md">
-                  {reviews.map((review) => (
-                    <div key={review.id} className="ls-card">
-                      <div className="flex items-start gap-md">
-                        <div className="w-[40px] h-[40px] rounded-full bg-ls-surface flex items-center justify-center flex-shrink-0">
-                          <span className="text-[14px] font-semibold text-ls-primary">
-                            {review.userName?.charAt(0)?.toUpperCase() || "?"}
+                <button
+                  onClick={handleSubmitReview}
+                  disabled={submittingReview || !reviewText.trim()}
+                  className="w-full bg-ls-primary text-white text-[14px] font-medium py-[12px] rounded-btn hover:opacity-90 disabled:opacity-50"
+                >
+                  {submittingReview ? "Submitting..." : "Submit Review"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Reviews */}
+        <div className="mt-xl">
+          <h2 className="text-section-header text-ls-primary mb-md">
+            Reviews {reviews.length > 0 && <span className="text-ls-secondary font-normal">({reviews.length})</span>}
+          </h2>
+          {reviews.length === 0 ? (
+            <div className="ls-card text-center py-xl">
+              <MessageSquare size={28} className="text-ls-secondary mx-auto" />
+              <p className="text-[14px] text-ls-secondary mt-sm">No reviews yet. Be the first!</p>
+            </div>
+          ) : (
+            <div className="space-y-md">
+              {reviews.map((review) => (
+                <div key={review.id} className="ls-card">
+                  <div className="flex items-center gap-sm">
+                    {review.userPhotoURL ? (
+                      <img src={review.userPhotoURL} alt="" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-ls-surface flex items-center justify-center text-[13px] font-bold text-ls-secondary">
+                        {review.userName?.[0] || "?"}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-ls-primary truncate">{review.userName}</p>
+                      <div className="flex items-center gap-xs">
+                        <StarRating rating={review.rating} size={12} />
+                        {review.createdAt && (
+                          <span className="text-[11px] text-ls-secondary">
+                            {(review.createdAt.toDate ? review.createdAt.toDate() : new Date(review.createdAt)).toLocaleDateString()}
                           </span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[14px] font-semibold text-ls-primary">{review.userName}</span>
-                            <span className="text-tag text-ls-secondary">
-                              {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : "Just now"}
-                            </span>
-                          </div>
-                          <div className="mt-xs"><StarRating rating={review.rating} size={12} showValue={false} /></div>
-                          {review.text && <p className="text-body text-ls-body mt-sm">{review.text}</p>}
-                        </div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  <p className="text-[13px] text-ls-body mt-sm leading-relaxed">{review.text}</p>
                 </div>
-              )}
+              ))}
             </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-[72px] space-y-lg">
-              <div className="ls-card overflow-hidden p-0">
-                <div className="relative h-[180px]">
-                  <iframe
-                    src={`https://maps.google.com/maps?q=${business.latitude},${business.longitude}&z=15&output=embed`}
-                    width="100%"
-                    height="180"
-                    style={{ border: 0 }}
-                    loading="lazy"
-                    title={`Map of ${business.name}`}
-                  />
-                </div>
-                <a
-                  href={getDirectionsUrl(business)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-xs text-[12px] text-ls-secondary hover:text-ls-primary py-[10px] border-t border-ls-border transition-colors"
-                >
-                  <MapPin size={12} /> View on Google Maps
-                </a>
-              </div>
-
-              <div className="ls-card space-y-lg">
-                <h3 className="text-[12px] font-semibold text-ls-secondary uppercase tracking-wider">Info</h3>
-                <div className="flex items-start gap-md">
-                  <MapPin size={18} className="text-ls-secondary flex-shrink-0 mt-[2px]" />
-                  <span className="text-[14px] text-ls-body">{business.address}</span>
-                </div>
-                {business.phone && (
-                  <div className="flex items-center gap-md">
-                    <Phone size={18} className="text-ls-secondary flex-shrink-0" />
-                    <a href={`tel:${business.phone}`} className="text-[14px] text-ls-primary hover:underline">{business.phone}</a>
-                  </div>
-                )}
-                {business.website && (
-                  <div className="flex items-center gap-md">
-                    <Globe size={18} className="text-ls-secondary flex-shrink-0" />
-                    <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-[14px] text-ls-primary hover:underline truncate">
-                      {business.website.replace(/^https?:\/\/(www\.)?/, "")}
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Claim My Business */}
-              {user && user.role !== "admin" && business.ownerId !== user.id && (
-                <div className="ls-card">
-                  <div className="flex items-center gap-sm mb-sm">
-                    <Building2 size={14} className="text-ls-secondary" />
-                    <h3 className="text-[12px] font-semibold text-ls-secondary uppercase tracking-wider">Own This Business?</h3>
-                  </div>
-                  {claimStatus === "none" && (
-                    <button
-                      onClick={() => setShowClaimModal(true)}
-                      className="text-[12px] text-ls-primary hover:underline font-medium"
-                    >
-                      Claim this business
-                    </button>
-                  )}
-                  {claimStatus === "pending" && (
-                    <p className="text-[12px] text-amber-600 font-medium">Claim pending review</p>
-                  )}
-                  {claimStatus === "approved" && (
-                    <p className="text-[12px] text-green-600 font-medium">Claim approved</p>
-                  )}
-                  {claimStatus === "denied" && (
-                    <p className="text-[12px] text-red-500 font-medium">Claim denied</p>
-                  )}
-                </div>
-              )}
-
-              {business.hours && business.hours.length > 0 && (
-                <div className="ls-card">
-                  <h3 className="text-[12px] font-semibold text-ls-secondary uppercase tracking-wider mb-md">
-                    <Clock size={14} className="inline mr-xs" /> Hours
-                  </h3>
-                  <div className="space-y-xs">
-                    {business.hours.map((line, i) => {
-                      const [day, ...rest] = line.split(": ");
-                      const time = rest.join(": ");
-                      const isToday = new Date().toLocaleDateString("en-US", { weekday: "long" }) === day;
-                      return (
-                        <div key={i} className={`flex justify-between text-[13px] ${isToday ? "font-semibold text-ls-primary" : "text-ls-body"}`}>
-                          <span>{day}</span>
-                          <span>{time || "—"}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
+
+        {/* Photo Grid */}
+        {allPhotoUrls.length > 1 && (
+          <div className="mt-xl">
+            <h2 className="text-section-header text-ls-primary mb-md">Photos</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-sm">
+              {allPhotoUrls.map((url, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setPhotoIndex(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  className="aspect-square rounded-card overflow-hidden"
+                >
+                  <img src={url} alt="" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

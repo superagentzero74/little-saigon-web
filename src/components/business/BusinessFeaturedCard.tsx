@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Business } from "@/lib/types";
 import { businessSlug, formatRating } from "@/lib/utils";
-import { CATEGORIES } from "@/lib/types";
+import { getCategoryInfo } from "@/lib/types";
 import { Star, MapPin } from "lucide-react";
 
 interface BusinessFeaturedCardProps {
@@ -11,7 +11,7 @@ interface BusinessFeaturedCardProps {
 
 export default function BusinessFeaturedCard({ business }: BusinessFeaturedCardProps) {
   const slug = businessSlug(business);
-  const catInfo = CATEGORIES[business.category];
+  const catInfo = getCategoryInfo(business);
   const photoUrl = business.photos?.[0];
 
   return (

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import type { Business, BusinessCategory } from "@/lib/types";
-import { getBusinesses, searchBusinesses } from "@/lib/services";
+import { getBusinesses, searchBusinesses, getPageSettings } from "@/lib/services";
 import BusinessCard from "@/components/business/BusinessCard";
 import CategoryPills from "@/components/ui/CategoryPills";
 
@@ -18,6 +18,8 @@ function ExploreContent() {
   const [activeSearch, setActiveSearch] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<BusinessCategory | null>(null);
   const [sortBy, setSortBy] = useState<"rating" | "name">("rating");
+  const [exploreCategories, setExploreCategories] = useState<BusinessCategory[] | undefined>(undefined);
+  const [showIcons, setShowIcons] = useState(true);
 
   const loadBusinesses = useCallback(async () => {
     setLoading(true);
@@ -44,6 +46,14 @@ function ExploreContent() {
   useEffect(() => {
     loadBusinesses();
   }, [loadBusinesses]);
+
+  useEffect(() => {
+    getPageSettings().then((s) => {
+      const cats = s.explore?.categories || s.exploreCategories;
+      if (cats) setExploreCategories(cats as BusinessCategory[]);
+      if (s.explore?.showIcons === false) setShowIcons(false);
+    }).catch(() => {});
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +113,8 @@ function ExploreContent() {
           <CategoryPills
             selected={selectedCategory}
             onSelect={setSelectedCategory}
+            visibleCategories={exploreCategories}
+            showIcons={showIcons}
           />
         </div>
         <div className="flex-shrink-0">

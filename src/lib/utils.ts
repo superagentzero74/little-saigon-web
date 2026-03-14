@@ -1,4 +1,5 @@
-import type { Business } from "./types";
+import type { Business, StructuredHourSlot } from "./types";
+import { isOpenStructured } from "./hours-utils";
 
 /**
  * Generate a URL-friendly slug from a business name + id
@@ -47,7 +48,8 @@ export function dishSlug(rank: number, name: string): string {
  * Check if a business is currently open based on hours array
  * Hours format from Google Places: "Monday: 8:00 AM – 9:00 PM"
  */
-export function isCurrentlyOpen(hours?: string[]): boolean | null {
+export function isCurrentlyOpen(hours?: string[], structuredHours?: StructuredHourSlot[]): boolean | null {
+  if (structuredHours && structuredHours.length > 0) return isOpenStructured(structuredHours);
   if (!hours || hours.length === 0) return null;
 
   const now = new Date();

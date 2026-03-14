@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, Loader2, CheckCircle, MapPin, Phone, Globe, Star, ChevronRight, X, ImageIcon } from "lucide-react";
-import { createBusiness, findDuplicateBusiness } from "@/lib/services";
+import { createBusiness, findDuplicateBusiness, getExistingPlaceIds } from "@/lib/services";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import type { BusinessCategory, PhotoTag } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
+import VietInput from "@/components/ui/VietInput";
 
 const CATEGORY_OPTIONS = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
 
@@ -23,7 +24,7 @@ interface PlaceResult {
 
 interface FormState {
   name: string;
-  category: BusinessCategory;
+  category: BusinessCategory; // now uses new 10 top-level categories
   address: string;
   phone: string;
   website: string;
@@ -46,12 +47,15 @@ const BLANK: FormState = {
 
 function inferCategory(types: string[]): BusinessCategory {
   if (types.some((t) => ["restaurant", "food", "meal_takeaway", "meal_delivery"].includes(t))) return "restaurant";
-  if (types.some((t) => ["bakery"].includes(t))) return "bakery";
-  if (types.some((t) => ["cafe", "coffee_shop"].includes(t))) return "cafe";
+  if (types.some((t) => ["bakery"].includes(t))) return "bakery_dessert";
+  if (types.some((t) => ["cafe", "coffee_shop"].includes(t))) return "coffee_tea";
   if (types.some((t) => ["grocery_or_supermarket", "supermarket"].includes(t))) return "grocery";
   if (types.some((t) => ["beauty_salon", "hair_care", "nail_salon", "spa"].includes(t))) return "beauty";
   if (types.some((t) => ["clothing_store", "shopping_mall", "store"].includes(t))) return "shopping";
-  return "business";
+  if (types.some((t) => ["doctor", "dentist", "pharmacy", "hospital"].includes(t))) return "health";
+  if (types.some((t) => ["night_club", "bar", "movie_theater"].includes(t))) return "entertainment";
+  if (types.some((t) => ["church", "school", "hindu_temple"].includes(t))) return "community";
+  return "services";
 }
 
 export default function AddBusinessPage() {
@@ -65,15 +69,24 @@ export default function AddBusinessPage() {
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean; dupId?: string } | null>(null);
+  const [existingPlaceIds, setExistingPlaceIds] = useState<Record<string, string>>({});
 
   const handleGoogleSearch = async () => {
     if (!googleQuery.trim()) return;
     setSearching(true);
     setResults([]);
+    setExistingPlaceIds({});
     try {
       const res = await fetch(`/api/places/search?query=${encodeURIComponent(googleQuery)}`);
       const data = await res.json();
-      setResults((data.results || []).slice(0, 8));
+      const places = (data.results || []).slice(0, 8) as PlaceResult[];
+      setResults(places);
+      // Check which results already exist in our database
+      const placeIds = places.map((p) => p.place_id).filter(Boolean);
+      if (placeIds.length > 0) {
+        const existing = await getExistingPlaceIds(placeIds);
+        setExistingPlaceIds(existing);
+      }
     } catch {
       setMsg({ text: "Google search failed", err: true });
     } finally {
@@ -167,6 +180,7 @@ export default function AddBusinessPage() {
         setSaving(false);
         return;
       }
+      const photoUrls = fetchedPhotos.map((p) => p.url);
       const id = await createBusiness({
         name: form.name.trim(),
         category: form.category,
@@ -181,7 +195,7 @@ export default function AddBusinessPage() {
         longitude: form.longitude ? parseFloat(form.longitude) : 0,
         placeId: form.placeId || null,
         hours: form.hours ? form.hours.split("\n").filter(Boolean) : [],
-        photos: [],
+        photos: photoUrls,
         active: form.active,
       } as any);
 
@@ -254,31 +268,48 @@ export default function AddBusinessPage() {
         {/* Search results */}
         {results.length > 0 && (
           <div className="mt-md border border-ls-border rounded-card overflow-hidden divide-y divide-ls-border">
-            {results.map((place) => (
-              <button
-                key={place.place_id}
-                onClick={() => handleSelectPlace(place)}
-                disabled={loadingDetails !== null}
-                className="w-full text-left px-md py-md hover:bg-ls-surface transition-colors flex items-center justify-between gap-md"
-              >
-                <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-ls-primary truncate">{place.name}</p>
-                  <p className="text-[12px] text-ls-secondary truncate">{place.formatted_address}</p>
-                  {place.rating && (
-                    <p className="text-[11px] text-amber-500 mt-[2px]">★ {place.rating} ({place.user_ratings_total?.toLocaleString()} ratings)</p>
-                  )}
+            {results.map((place) => {
+              const existingId = existingPlaceIds[place.place_id];
+              return (
+                <div
+                  key={place.place_id}
+                  className={`w-full text-left px-md py-md flex items-center justify-between gap-md ${existingId ? "bg-amber-50" : "hover:bg-ls-surface"} transition-colors`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-sm">
+                      <p className="text-[14px] font-semibold text-ls-primary truncate">{place.name}</p>
+                      {existingId && (
+                        <span className="shrink-0 text-[10px] font-semibold bg-amber-100 text-amber-700 px-[6px] py-[1px] rounded-full">
+                          Already in database
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[12px] text-ls-secondary truncate">{place.formatted_address}</p>
+                    {place.rating && (
+                      <p className="text-[11px] text-amber-500 mt-[2px]">★ {place.rating} ({place.user_ratings_total?.toLocaleString()} ratings)</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex items-center gap-sm">
+                    {existingId && (
+                      <Link href={`/admin/businesses/${existingId}/edit`} className="text-[11px] font-medium text-amber-700 hover:underline">
+                        Edit
+                      </Link>
+                    )}
+                    {loadingDetails === place.place_id ? (
+                      <Loader2 size={16} className="text-ls-primary animate-spin" />
+                    ) : (
+                      <button
+                        onClick={() => handleSelectPlace(place)}
+                        disabled={loadingDetails !== null}
+                        className="text-[12px] font-semibold text-ls-primary border border-ls-primary rounded px-sm py-[3px] hover:bg-ls-primary hover:text-white transition-colors"
+                      >
+                        {existingId ? "Re-import" : "Use this"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="shrink-0">
-                  {loadingDetails === place.place_id ? (
-                    <Loader2 size={16} className="text-ls-primary animate-spin" />
-                  ) : (
-                    <span className="text-[12px] font-semibold text-ls-primary border border-ls-primary rounded px-sm py-[3px] hover:bg-ls-primary hover:text-white transition-colors">
-                      Use this
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -344,7 +375,7 @@ export default function AddBusinessPage() {
           {/* Name */}
           <div className="sm:col-span-2">
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Business Name *</label>
-            <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Phở 79" className={inputClass} />
+            <VietInput value={form.name} onChange={(v) => set("name", v)} placeholder="e.g. Phở 79" className={inputClass} />
           </div>
 
           {/* Category */}
@@ -440,7 +471,7 @@ export default function AddBusinessPage() {
           {/* Description */}
           <div className="sm:col-span-2">
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Description</label>
-            <textarea value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Brief description of the business…" rows={3} className={inputClass + " resize-none"} />
+            <VietInput value={form.description} onChange={(v) => set("description", v)} placeholder="Brief description of the business…" multiline rows={3} className={inputClass + " resize-none"} />
           </div>
 
           {/* Hours */}

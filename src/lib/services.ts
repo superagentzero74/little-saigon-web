@@ -1,6 +1,6 @@
 import { db, auth, storage } from "./firebase";
 import {
-  collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, writeBatch,
   query, where, orderBy, limit, startAfter, increment, serverTimestamp,
   DocumentSnapshot, arrayUnion, arrayRemove,
 } from "firebase/firestore";
@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type {
   Business, BusinessPhoto, Review, MonVietDish, BusinessCategory,
   AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection, DishFeaturedEntry, ClaimRequest,
+  SubcategoryInfo, CategoryInfo, PromoBanner, Promotion, UserOffer, OfferType, PromotionStatus, IssuanceTrigger,
 } from "./types";
 import { POINTS } from "./types";
 
@@ -45,16 +46,52 @@ export async function getBusinessById(id: string): Promise<Business | null> {
 }
 
 export async function getBusinessesByCategory(category: BusinessCategory, limitCount = 100): Promise<Business[]> {
-  const q = query(collection(db, "businesses"), where("category", "==", category), limit(limitCount));
-  const snap = await getDocs(q);
-  return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() })) as Business[];
+  // Query both legacy `category` field and new `categories` array
+  const [legacySnap, newSnap] = await Promise.all([
+    getDocs(query(collection(db, "businesses"), where("category", "==", category), limit(limitCount))),
+    getDocs(query(collection(db, "businesses"), where("categories", "array-contains", category), limit(limitCount))),
+  ]);
+  const map = new Map<string, Business>();
+  for (const d of [...legacySnap.docs, ...newSnap.docs]) {
+    if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() } as Business);
+  }
+  return Array.from(map.values()).slice(0, limitCount);
 }
 
 export async function getTopRatedBusinesses(limitCount = 12): Promise<Business[]> {
   const q = query(collection(db, "businesses"), orderBy("rating", "desc"), limit(limitCount));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
+}
+
+export async function getCategories(): Promise<CategoryInfo[]> {
+  const q = query(collection(db, "categories"), orderBy("order"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ slug: d.id, ...d.data() })) as CategoryInfo[];
+}
+
+export async function getSubcategories(parentSlug?: BusinessCategory): Promise<SubcategoryInfo[]> {
+  const constraints: any[] = [orderBy("order")];
+  if (parentSlug) constraints.push(where("parentSlug", "==", parentSlug));
+  const q = query(collection(db, "subcategories"), ...constraints);
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ slug: d.id, ...d.data() })) as SubcategoryInfo[];
+}
+
+export async function saveCategory(slug: string, data: Partial<CategoryInfo>): Promise<void> {
+  await setDoc(doc(db, "categories", slug), data, { merge: true });
+}
+
+export async function deleteCategory(slug: string): Promise<void> {
+  await deleteDoc(doc(db, "categories", slug));
+}
+
+export async function saveSubcategory(slug: string, data: Partial<SubcategoryInfo>): Promise<void> {
+  await setDoc(doc(db, "subcategories", slug), data, { merge: true });
+}
+
+export async function deleteSubcategory(slug: string): Promise<void> {
+  await deleteDoc(doc(db, "subcategories", slug));
 }
 
 function normalizeStr(s: string): string {
@@ -73,6 +110,23 @@ export async function searchBusinesses(searchQuery: string): Promise<Business[]>
       normalizeStr(b.address || "").includes(needle) ||
       normalizeStr(b.category || "").includes(needle)
   );
+}
+
+export async function getExistingPlaceIds(placeIds: string[]): Promise<Record<string, string>> {
+  if (placeIds.length === 0) return {};
+  // Firestore in() supports max 30 values
+  const chunks: string[][] = [];
+  for (let i = 0; i < placeIds.length; i += 30) chunks.push(placeIds.slice(i, i + 30));
+  const result: Record<string, string> = {};
+  for (const chunk of chunks) {
+    const q = query(collection(db, "businesses"), where("placeId", "in", chunk));
+    const snap = await getDocs(q);
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      if (data.placeId) result[data.placeId] = d.id;
+    });
+  }
+  return result;
 }
 
 // ============================================
@@ -109,6 +163,33 @@ export async function updateBusinessPhoto(businessId: string, photoId: string, d
   await updateDoc(doc(db, "businesses", businessId, "photos", photoId), data as any);
 }
 
+async function optimizeImage(file: File, maxDim = 1200, quality = 0.7): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (Math.max(width, height) > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas not supported")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error("Compression failed")),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export async function uploadBusinessPhoto(
   businessId: string,
   file: File,
@@ -117,10 +198,10 @@ export async function uploadBusinessPhoto(
   const user = auth.currentUser;
   if (!user) throw new Error("Must be logged in to upload photos");
 
-  const ext = file.name.split(".").pop() || "jpg";
-  const path = `businesses/${businessId}/photos/${user.uid}_${Date.now()}.${ext}`;
+  const optimized = await optimizeImage(file);
+  const path = `businesses/${businessId}/photos/${user.uid}_${Date.now()}.jpg`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, file);
+  await uploadBytes(storageRef, optimized, { contentType: "image/jpeg" });
   const url = await getDownloadURL(storageRef);
 
   const photoData = {
@@ -494,6 +575,52 @@ export async function setDishFeatured(dishRank: number, businessIds: string[]): 
   });
 }
 
+export async function addFood(data: {
+  vietnameseName: string;
+  englishName: string;
+  rank: number;
+  shortDescription?: string;
+  description?: string;
+  history?: string;
+  pronunciation?: string;
+  searchQuery?: string;
+}): Promise<string> {
+  const docRef = await addDoc(collection(db, "foods"), {
+    id: data.rank,
+    vietnameseName: data.vietnameseName,
+    englishName: data.englishName,
+    shortDescription: data.shortDescription || "",
+    description: data.description || "",
+    history: data.history || "",
+    pronunciation: data.pronunciation || "",
+    searchQuery: data.searchQuery || data.vietnameseName.toLowerCase(),
+    isActive: true,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateFood(docId: string, data: Partial<{
+  vietnameseName: string;
+  englishName: string;
+  shortDescription: string;
+  description: string;
+  history: string;
+  pronunciation: string;
+  searchQuery: string;
+  isActive: boolean;
+}>): Promise<void> {
+  await updateDoc(doc(db, "foods", docId), { ...data, updatedAt: serverTimestamp() });
+}
+
+export async function reorderFoods(orderedIds: { docId: string; rank: number }[]): Promise<void> {
+  const batch = writeBatch(db);
+  for (const { docId, rank } of orderedIds) {
+    batch.update(doc(db, "foods", docId), { id: rank });
+  }
+  await batch.commit();
+}
+
 // ============================================
 // Geo Helpers
 // ============================================
@@ -657,6 +784,71 @@ export async function getNewlyAddedBusinesses(limitCount = 5): Promise<Business[
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
 }
 
+// ============================================
+// Page Settings
+// ============================================
+
+export interface PageConfig {
+  categories?: string[];     // category slugs visible on this page
+  showIcons?: boolean;       // show emoji icons for categories
+  tags?: string[];           // custom tags/labels for the page
+}
+
+export interface PageSettings {
+  homeCategories?: string[];      // legacy — kept for backward compat
+  exploreCategories?: string[];   // legacy — kept for backward compat
+  home?: PageConfig;
+  explore?: PageConfig;
+  category?: PageConfig;
+}
+
+export async function getPageSettings(): Promise<PageSettings> {
+  const snap = await getDoc(doc(db, "settings", "pages"));
+  if (!snap.exists()) return {};
+  return snap.data() as PageSettings;
+}
+
+export async function savePageSettings(data: Partial<PageSettings>): Promise<void> {
+  await setDoc(doc(db, "settings", "pages"), data, { merge: true });
+}
+
+// ============================================
+// Promo Banners
+// ============================================
+
+export async function getPromoBanners(): Promise<PromoBanner[]> {
+  const snap = await getDocs(query(collection(db, "promoBanners"), orderBy("order")));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as PromoBanner));
+}
+
+export async function createPromoBanner(data: Omit<PromoBanner, "id">): Promise<string> {
+  const docRef = await addDoc(collection(db, "promoBanners"), data);
+  return docRef.id;
+}
+
+export async function updatePromoBanner(id: string, data: Partial<PromoBanner>): Promise<void> {
+  await updateDoc(doc(db, "promoBanners", id), data);
+}
+
+export async function deletePromoBanner(id: string): Promise<void> {
+  await deleteDoc(doc(db, "promoBanners", id));
+}
+
+export async function uploadPromoBannerImage(file: File): Promise<string> {
+  const timestamp = Date.now();
+  const storageRef = ref(storage, `promoBanners/${timestamp}_${file.name}`);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
+}
+
+export async function reorderPromoBanners(banners: PromoBanner[]): Promise<void> {
+  const batch = writeBatch(db);
+  banners.forEach((b, i) => {
+    batch.update(doc(db, "promoBanners", b.id), { order: i });
+  });
+  await batch.commit();
+}
+
 export async function getAdminStats(): Promise<{ businesses: number; users: number; reviews: number }> {
   const [bizSnap, userSnap, reviewSnap] = await Promise.all([
     getDocs(query(collection(db, "businesses"), limit(500))),
@@ -668,4 +860,159 @@ export async function getAdminStats(): Promise<{ businesses: number; users: numb
     users: userSnap.size,
     reviews: reviewSnap.size,
   };
+}
+
+// ============================================
+// Promotions
+// ============================================
+
+/** Fetch all businesses (lightweight, for admin dropdowns) */
+export async function getAllBusinesses(): Promise<Business[]> {
+  const snap = await getDocs(query(collection(db, "businesses"), limit(500)));
+  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Business);
+  list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return list;
+}
+
+export async function getPromotions(): Promise<Promotion[]> {
+  const snap = await getDocs(
+    query(collection(db, "promotions"), orderBy("createdAt", "desc"))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Promotion);
+}
+
+/** Fetch only active promotions (for public-facing pages) */
+export async function getActivePromotions(): Promise<Promotion[]> {
+  const snap = await getDocs(
+    query(collection(db, "promotions"), where("status", "==", "active"))
+  );
+  const promos = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Promotion);
+  const toMs = (ts: any) => {
+    if (!ts) return 0;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.seconds) return ts.seconds * 1000;
+    return 0;
+  };
+  promos.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
+  return promos;
+}
+
+export async function getPromotion(id: string): Promise<Promotion | null> {
+  const snap = await getDoc(doc(db, "promotions", id));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as Promotion;
+}
+
+export async function createPromotion(data: Omit<Promotion, "id">): Promise<string> {
+  const ref = await addDoc(collection(db, "promotions"), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updatePromotion(id: string, data: Partial<Promotion>): Promise<void> {
+  await updateDoc(doc(db, "promotions", id), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deletePromotion(id: string): Promise<void> {
+  await deleteDoc(doc(db, "promotions", id));
+}
+
+/** Manually issue an offer to a specific user */
+export async function issueOfferToUser(
+  userId: string,
+  promotion: Promotion
+): Promise<string> {
+  const nonce = crypto.randomUUID();
+  const userOfferRef = doc(collection(db, "userOffers"));
+
+  const qrPayload = JSON.stringify({
+    userId,
+    userOfferId: userOfferRef.id,
+    promotionId: promotion.id,
+    nonce,
+  });
+
+  await setDoc(userOfferRef, {
+    userOfferId: userOfferRef.id,
+    userId,
+    promotionId: promotion.id,
+    businessId: promotion.businessId,
+    businessName: promotion.businessName,
+    title: promotion.title,
+    description: promotion.description,
+    type: promotion.type,
+    status: "issued",
+    issuedAt: serverTimestamp(),
+    issuedBy: `admin:${auth.currentUser?.uid || "unknown"}`,
+    expiresAt: promotion.validUntil || null,
+    redeemedAt: null,
+    redeemedAtBusinessId: null,
+    scannedByOwnerId: null,
+    qrPayload,
+    qrNonce: nonce,
+  });
+
+  return userOfferRef.id;
+}
+
+/** Fetch offers for a specific user */
+export async function getUserOffers(userId: string): Promise<UserOffer[]> {
+  const snap = await getDocs(
+    query(collection(db, "userOffers"), where("userId", "==", userId))
+  );
+  const offers = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as UserOffer);
+  offers.sort((a, b) => {
+    const toMs = (ts: any) => {
+      if (!ts) return 0;
+      if (ts.toMillis) return ts.toMillis();
+      if (ts.seconds) return ts.seconds * 1000;
+      return 0;
+    };
+    return toMs(b.issuedAt) - toMs(a.issuedAt);
+  });
+  return offers;
+}
+
+/** Fetch a single user by ID */
+export async function getUserById(userId: string): Promise<AppUser | null> {
+  const snap = await getDoc(doc(db, "users", userId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as AppUser;
+}
+
+/** Search users by name or email for manual issuance */
+export async function searchUsers(searchTerm: string, maxResults = 10): Promise<AppUser[]> {
+  // Firestore doesn't support full-text search, so we fetch and filter client-side
+  const snap = await getDocs(query(collection(db, "users"), limit(200)));
+  const term = searchTerm.toLowerCase();
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as AppUser)
+    .filter(
+      (u) =>
+        u.displayName?.toLowerCase().includes(term) ||
+        u.email?.toLowerCase().includes(term)
+    )
+    .slice(0, maxResults);
+}
+
+/** Fetch all userOffers for a given promotion (for admin stats) */
+export async function getOffersByPromotion(promotionId: string): Promise<UserOffer[]> {
+  const snap = await getDocs(
+    query(collection(db, "userOffers"), where("promotionId", "==", promotionId))
+  );
+  const offers = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as UserOffer);
+  const toMs = (ts: any) => {
+    if (!ts) return 0;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.seconds) return ts.seconds * 1000;
+    return 0;
+  };
+  offers.sort((a, b) => toMs(b.issuedAt) - toMs(a.issuedAt));
+  return offers;
 }

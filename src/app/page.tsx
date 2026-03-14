@@ -4,42 +4,43 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, MapPin, ChevronRight } from "lucide-react";
-import type { Business, MonVietDish, BusinessCategory } from "@/lib/types";
+import type { Business, MonVietDish, BusinessCategory, PromoBanner } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
-import { getTopRatedBusinesses, getDishes } from "@/lib/services";
+import { getTopRatedBusinesses, getDishes, getPageSettings, getPromoBanners } from "@/lib/services";
 import BusinessFeaturedCard from "@/components/business/BusinessFeaturedCard";
 import DishCard from "@/components/guide/DishCard";
 
-const HERO_IMAGES = [
-  { src: "/hero-1.webp", alt: "Asian Garden Mall — Phước Lộc Thọ" },
-  { src: "/hero-2.jpg", alt: "Tết celebration at Phước Lộc Thọ" },
-  { src: "/hero-3.jpg", alt: "Today Plaza — Thương Xá Kim Nhật" },
-];
 
 export default function HomePage() {
   const [topRated, setTopRated] = useState<Business[]>([]);
   const [dishes, setDishes] = useState<MonVietDish[]>([]);
+  const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
+  const [visibleCategories, setVisibleCategories] = useState<BusinessCategory[] | null>(null);
+  const [showIcons, setShowIcons] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [heroIndex, setHeroIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setHeroIndex((i) => (i + 1) % HERO_IMAGES.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     async function load() {
       try {
-        const [bizResult, dishResult] = await Promise.allSettled([
+        const [bizResult, dishResult, settingsResult, bannersResult] = await Promise.allSettled([
           getTopRatedBusinesses(12),
           getDishes(),
+          getPageSettings(),
+          getPromoBanners(),
         ]);
         if (bizResult.status === "fulfilled") setTopRated(bizResult.value);
         else console.error("Failed to load businesses:", bizResult.reason);
-        if (dishResult.status === "fulfilled") setDishes(dishResult.value.slice(0, 8));
+        if (dishResult.status === "fulfilled") setDishes(dishResult.value.slice(0, 16));
         else console.error("Failed to load dishes:", dishResult.reason);
+        if (bannersResult.status === "fulfilled") {
+          setPromoBanners(bannersResult.value.filter((b) => b.active));
+        }
+        if (settingsResult.status === "fulfilled") {
+          const s = settingsResult.value;
+          const cats = s.home?.categories || s.homeCategories;
+          if (cats) setVisibleCategories(cats as BusinessCategory[]);
+          if (s.home?.showIcons === false) setShowIcons(false);
+        }
       } finally {
         setLoading(false);
       }
@@ -47,49 +48,29 @@ export default function HomePage() {
     load();
   }, []);
 
-  const categories = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
+  const allCategories = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
+  const categories = visibleCategories
+    ? allCategories.filter(([key]) => visibleCategories.includes(key))
+    : allCategories;
 
   return (
     <div>
       {/* ============ Hero ============ */}
-      <section className="relative text-white overflow-hidden">
-        {/* Background slideshow */}
-        <div className="absolute inset-0">
-          {HERO_IMAGES.map((img, i) => (
-            <Image
-              key={img.src}
-              src={img.src}
-              alt={img.alt}
-              fill
-              className={`object-cover object-center transition-opacity duration-1000 ${i === heroIndex ? "opacity-100" : "opacity-0"}`}
-              priority={i === 0}
-            />
-          ))}
-          {/* Dark overlay */}
-          <div className="absolute inset-0 bg-black/30" />
-        </div>
-
-        {/* Slide dots */}
-        <div className="absolute bottom-md left-1/2 -translate-x-1/2 flex gap-[6px] z-10">
-          {HERO_IMAGES.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setHeroIndex(i)}
-              className={`w-[8px] h-[8px] rounded-full transition-all ${i === heroIndex ? "bg-white scale-125" : "bg-white/40"}`}
-            />
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="relative ls-container py-[48px] md:py-[80px]">
-          <p className="text-meta text-white/70 uppercase tracking-widest mb-sm">
-            Westminster · Garden Grove · Fountain Valley · Santa Ana
-          </p>
-          <h1 className="text-[36px] md:text-[52px] font-bold leading-tight">
-            Xin Chào!
-          </h1>
-          <p className="text-[18px] text-white/80 mt-sm max-w-lg">
+      <section className="bg-white">
+        <div className="ls-container py-[32px] md:py-[48px] flex flex-col items-center text-center">
+          <Image
+            src="/xin-chao-banner.png"
+            alt="Xin Chào!"
+            width={1066}
+            height={434}
+            className="w-full max-w-[480px] h-auto"
+            priority
+          />
+          <p className="text-[16px] md:text-[18px] text-ls-body mt-md max-w-lg">
             Discover the best Vietnamese restaurants, businesses, and services in Little Saigon, Southern California.
+          </p>
+          <p className="text-meta text-ls-secondary uppercase tracking-widest mt-sm">
+            Westminster · Garden Grove · Fountain Valley · Santa Ana
           </p>
         </div>
       </section>
@@ -107,7 +88,7 @@ export default function HomePage() {
                 href={`/category/${key}`}
                 className="ls-card flex flex-col items-center gap-sm py-xl text-center group"
               >
-                <span className="text-[28px]">{icon}</span>
+                {showIcons && <span className="text-[28px]">{icon}</span>}
                 <span className="text-meta text-ls-primary group-hover:font-semibold transition-all">
                   {label}
                 </span>
@@ -117,16 +98,73 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ============ Promo Banners ============ */}
+      {promoBanners.length > 0 && (
+        <section className="ls-section py-md overflow-hidden">
+          <div className="ls-container">
+            <style>{`
+              @keyframes slideInFromRight {
+                from { transform: translateX(60px); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+              }
+              .promo-slide-in { animation: slideInFromRight 0.6s ease-out both; }
+            `}</style>
+            <div className="flex gap-md overflow-x-auto pb-sm scrollbar-hide">
+              {promoBanners.map((banner, idx) => {
+                const href =
+                  banner.linkType === "search"
+                    ? `/explore?q=${encodeURIComponent(banner.linkValue)}`
+                    : banner.linkType === "food"
+                    ? `/guide/${banner.linkValue}`
+                    : banner.linkType === "category"
+                    ? (() => {
+                        const [cat, sub] = banner.linkValue.split(":");
+                        return sub
+                          ? `/category/${encodeURIComponent(cat)}?sub=${encodeURIComponent(sub)}`
+                          : `/explore?category=${encodeURIComponent(cat)}`;
+                      })()
+
+                    : banner.linkValue;
+                const isExternal = banner.linkType === "url";
+                const img = (
+                  <div
+                    className="flex-shrink-0 rounded-card overflow-hidden group promo-slide-in"
+                    style={{ height: "325px", animationDelay: `${idx * 0.1}s` }}
+                  >
+                    <Image
+                      src={banner.imageURL}
+                      alt=""
+                      width={440}
+                      height={650}
+                      className="h-full w-auto object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
+                );
+                return isExternal ? (
+                  <a key={banner.id} href={href} target="_blank" rel="noopener noreferrer">
+                    {img}
+                  </a>
+                ) : (
+                  <Link key={banner.id} href={href}>
+                    {img}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ============ Favorite Viet Foods Teaser ============ */}
       <section className="ls-section bg-ls-surface/50">
         <div className="ls-container">
           <div className="flex items-center justify-between mb-lg">
             <div>
               <h2 className="text-section-header text-ls-primary">
-                Top 50 Món Việt
+                Food Guide
               </h2>
               <p className="text-meta text-ls-secondary mt-xs">
-                50 Essential Vietnamese Dishes
+                Popular Vietnamese dishes, drinks, and desserts
               </p>
             </div>
             <Link
@@ -140,29 +178,31 @@ export default function HomePage() {
           {loading ? (
             <div className="flex gap-lg overflow-hidden">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="w-[100px] flex-shrink-0 animate-pulse">
-                  <div className="w-[80px] h-[80px] mx-auto rounded-card bg-ls-surface" />
-                  <div className="h-3 bg-ls-surface rounded mt-sm mx-auto w-16" />
+                <div key={i} className="w-[180px] flex-shrink-0 animate-pulse">
+                  <div className="w-[160px] h-[160px] mx-auto rounded-card bg-ls-surface" />
+                  <div className="h-3 bg-ls-surface rounded mt-sm mx-auto w-20" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex gap-lg overflow-x-auto pb-sm scrollbar-hide">
-              {dishes.map((dish) => (
-                <DishCard key={dish.id} dish={dish} variant="compact" />
-              ))}
-              {/* View all card */}
-              <Link
-                href="/guide"
-                className="flex-shrink-0 w-[100px] flex flex-col items-center justify-center"
-              >
-                <div className="w-[80px] h-[80px] rounded-card bg-ls-primary flex items-center justify-center">
-                  <ArrowRight size={24} className="text-white" />
-                </div>
-                <p className="text-[11px] font-medium text-ls-primary mt-xs">
-                  View All 50
-                </p>
-              </Link>
+            <div className="overflow-x-auto pb-sm scrollbar-hide">
+              <div className="grid grid-rows-2 grid-flow-col gap-x-lg gap-y-md" style={{ width: "max-content" }}>
+                {dishes.map((dish) => (
+                  <DishCard key={dish.id} dish={dish} variant="compact" />
+                ))}
+                {/* View all card */}
+                <Link
+                  href="/guide"
+                  className="flex-shrink-0 w-[180px] flex flex-col items-center justify-center"
+                >
+                  <div className="w-[160px] h-[160px] rounded-card bg-ls-primary flex items-center justify-center">
+                    <ArrowRight size={32} className="text-white" />
+                  </div>
+                  <p className="text-[13px] font-medium text-ls-primary mt-xs">
+                    View All 50
+                  </p>
+                </Link>
+              </div>
             </div>
           )}
         </div>

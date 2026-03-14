@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { auth } from "@/lib/firebase";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 
 type Tab = "login" | "signup";
@@ -22,6 +23,16 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
 
+  const redirectAfterLogin = async () => {
+    // Check if user is admin and redirect accordingly
+    const profile = await import("@/lib/services").then(m => m.getUserProfile(auth.currentUser!.uid));
+    if (profile?.role === "admin") {
+      router.push("/admin");
+    } else {
+      router.push("/");
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -33,7 +44,7 @@ export default function LoginPage() {
         if (!displayName.trim()) { setError("Display name is required"); setLoading(false); return; }
         await signUpWithEmail(email, password, displayName.trim());
       }
-      router.push("/");
+      await redirectAfterLogin();
     } catch (err: any) {
       setError(err.message?.replace("Firebase: ", "") || "Something went wrong");
     } finally {
@@ -45,7 +56,7 @@ export default function LoginPage() {
     setError("");
     try {
       await loginWithGoogle();
-      router.push("/");
+      await redirectAfterLogin();
     } catch (err: any) {
       if (!err.message?.includes("popup-closed")) {
         setError(err.message?.replace("Firebase: ", "") || "Google sign-in failed");
@@ -57,7 +68,7 @@ export default function LoginPage() {
     setError("");
     try {
       await loginWithApple();
-      router.push("/");
+      await redirectAfterLogin();
     } catch (err: any) {
       if (!err.message?.includes("popup-closed")) {
         setError(err.message?.replace("Firebase: ", "") || "Apple sign-in failed");

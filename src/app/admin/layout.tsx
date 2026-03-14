@@ -5,16 +5,20 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2,
+  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/businesses", label: "Businesses", icon: Store },
+  { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/reviews", label: "Reviews", icon: Star },
-  { href: "/admin/guide", label: "Món Việt Guide", icon: BookOpen },
+  { href: "/admin/guide", label: "Food Guide", icon: BookOpen },
+  { href: "/admin/promotions", label: "Promotions", icon: Ticket },
   { href: "/admin/claims", label: "Claims", icon: Building2 },
+  { href: "/admin/banners", label: "Promo Banners", icon: Image },
+  { href: "/admin/settings", label: "Page Settings", icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -23,15 +27,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) {
+    if (!loading && !user) {
+      router.replace("/login");
+    } else if (!loading && user && user.role !== "admin") {
       router.replace("/");
     }
   }, [user, loading, router]);
 
-  if (loading || !user || user.role !== "admin") {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-ls-secondary">
         Loading...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-ls-secondary">
+        Redirecting to login...
+      </div>
+    );
+  }
+
+  if (user.role !== "admin") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-ls-secondary gap-2">
+        <p>Access denied. Your role: <strong>{user.role}</strong></p>
+        <p className="text-xs">User ID: {user.id}</p>
       </div>
     );
   }
