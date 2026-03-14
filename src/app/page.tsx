@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, MapPin, ChevronRight } from "lucide-react";
-import type { Business, MonVietDish, BusinessCategory, PromoBanner } from "@/lib/types";
-import { CATEGORIES } from "@/lib/types";
-import { getTopRatedBusinesses, getDishes, getPageSettings, getPromoBanners } from "@/lib/services";
+import type { Business, MonVietDish, PromoBanner } from "@/lib/types";
+import { getTopRatedBusinesses, getDishes, getPromoBanners } from "@/lib/services";
 import BusinessFeaturedCard from "@/components/business/BusinessFeaturedCard";
 import DishCard from "@/components/guide/DishCard";
 
@@ -15,27 +14,12 @@ export default function HomePage() {
   const [topRated, setTopRated] = useState<Business[] | null>(null);
   const [dishes, setDishes] = useState<MonVietDish[] | null>(null);
   const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
-  const [visibleCategories, setVisibleCategories] = useState<BusinessCategory[] | null>(null);
-  const [showIcons, setShowIcons] = useState(true);
-  const [settingsReady, setSettingsReady] = useState(false);
 
   useEffect(() => {
-    // Fire all requests independently so each section renders as soon as its data arrives
     getTopRatedBusinesses(12).then(setTopRated).catch(() => setTopRated([]));
     getDishes().then((all) => setDishes(all.slice(0, 16))).catch(() => setDishes([]));
     getPromoBanners().then((b) => setPromoBanners(b.filter((x) => x.active))).catch(() => {});
-    getPageSettings().then((s) => {
-      const cats = s.home?.categories || s.homeCategories;
-      if (cats) setVisibleCategories(cats as BusinessCategory[]);
-      if (s.home?.showIcons === false) setShowIcons(false);
-      setSettingsReady(true);
-    }).catch(() => setSettingsReady(true));
   }, []);
-
-  const allCategories = Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][];
-  const categories = visibleCategories
-    ? allCategories.filter(([key]) => visibleCategories.includes(key))
-    : allCategories;
 
   return (
     <div>
@@ -56,29 +40,6 @@ export default function HomePage() {
           <p className="text-meta text-ls-secondary uppercase tracking-widest mt-sm">
             Westminster · Garden Grove · Fountain Valley · Santa Ana
           </p>
-        </div>
-      </section>
-
-      {/* ============ Categories ============ */}
-      <section className="ls-section">
-        <div className="ls-container">
-          <div className="flex items-center justify-between mb-lg">
-            <h2 className="text-section-header text-ls-primary">Browse by Category</h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-md">
-            {categories.map(([key, { label, icon }]) => (
-              <Link
-                key={key}
-                href={`/category/${key}`}
-                className="ls-card flex flex-col items-center gap-sm py-xl text-center group"
-              >
-                {showIcons && <span className="text-[28px]">{icon}</span>}
-                <span className="text-meta text-ls-primary group-hover:font-semibold transition-all">
-                  {label}
-                </span>
-              </Link>
-            ))}
-          </div>
         </div>
       </section>
 
