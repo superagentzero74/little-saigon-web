@@ -325,9 +325,15 @@ export async function checkIn(businessId: string, userLat: number, userLng: numb
 
   const docRef = await addDoc(collection(db, "checkIns"), checkInData);
 
-  // Award points + increment check-in count
-  await awardPoints(user.uid, POINTS.CHECK_IN, "check_in", businessId);
-  await updateDoc(doc(db, "users", user.uid), { checkInCount: increment(1) });
+  // Award points + increment check-in count (don't let failures here block the check-in)
+  try {
+    await Promise.all([
+      awardPoints(user.uid, POINTS.CHECK_IN, "check_in", businessId),
+      updateDoc(doc(db, "users", user.uid), { checkInCount: increment(1) }),
+    ]);
+  } catch (err) {
+    console.error("Failed to award points after check-in:", err);
+  }
 
   return { id: docRef.id, ...checkInData } as CheckIn;
 }
