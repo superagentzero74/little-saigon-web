@@ -91,8 +91,8 @@ export default function BusinessDetailPage() {
       setBusiness(biz);
 
       const [p, r] = await Promise.all([
-        getBusinessPhotos(biz.id).catch(() => []),
-        getReviewsForBusiness(biz.id).catch(() => []),
+        getBusinessPhotos(biz.id).catch((e) => { console.error("Photos fetch error:", e); return []; }),
+        getReviewsForBusiness(biz.id).catch((e) => { console.error("Reviews fetch error:", e); return []; }),
       ]);
       setPhotos(p);
       setReviews(r);
