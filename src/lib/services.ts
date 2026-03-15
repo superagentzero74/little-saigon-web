@@ -2,7 +2,7 @@ import { db, auth, storage } from "./firebase";
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, writeBatch,
   query, where, orderBy, limit, startAfter, increment, serverTimestamp,
-  DocumentSnapshot, arrayUnion, arrayRemove,
+  DocumentSnapshot, arrayUnion, arrayRemove, getCountFromServer,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type {
@@ -856,15 +856,15 @@ export async function reorderPromoBanners(banners: PromoBanner[]): Promise<void>
 }
 
 export async function getAdminStats(): Promise<{ businesses: number; users: number; reviews: number }> {
-  const [bizSnap, userSnap, reviewSnap] = await Promise.all([
-    getDocs(query(collection(db, "businesses"), limit(500))),
-    getDocs(query(collection(db, "users"), limit(500))),
-    getDocs(query(collection(db, "reviews"), limit(500))),
+  const [bizCount, userCount, reviewCount] = await Promise.all([
+    getCountFromServer(query(collection(db, "businesses"))),
+    getCountFromServer(query(collection(db, "users"))),
+    getCountFromServer(query(collection(db, "reviews"))),
   ]);
   return {
-    businesses: bizSnap.size,
-    users: userSnap.size,
-    reviews: reviewSnap.size,
+    businesses: bizCount.data().count,
+    users: userCount.data().count,
+    reviews: reviewCount.data().count,
   };
 }
 
