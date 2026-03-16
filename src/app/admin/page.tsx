@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Store, Users, Star, TrendingUp, ChevronRight, ArrowRight, Pencil } from "lucide-react";
-import { getAdminStats, getAllReviews, getNewlyAddedBusinesses } from "@/lib/services";
+import { getAdminStats, getAllReviews, getNewlyAddedBusinesses, getBusinessById } from "@/lib/services";
 import type { Review, Business } from "@/lib/types";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<{ businesses: number; users: number; reviews: number } | null>(null);
-  const [recentReviews, setRecentReviews] = useState<Review[]>([]);
+  const [recentReviews, setRecentReviews] = useState<(Review & { businessName?: string })[]>([]);
   const [newBiz, setNewBiz] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,10 +17,17 @@ export default function AdminDashboard() {
       getAdminStats(),
       getAllReviews(5),
       getNewlyAddedBusinesses(5),
-    ]).then(([s, r, b]) => {
+    ]).then(async ([s, r, b]) => {
       setStats(s);
-      setRecentReviews(r);
       setNewBiz(b);
+      // Resolve business names for reviews
+      const enriched = await Promise.all(
+        r.map(async (review) => {
+          const biz = await getBusinessById(review.businessId).catch(() => null);
+          return { ...review, businessName: biz?.name };
+        })
+      );
+      setRecentReviews(enriched);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -83,7 +90,9 @@ export default function AdminDashboard() {
                 <div className="flex items-start justify-between gap-md">
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-ls-primary truncate">{r.userName}</p>
-                    <p className="text-[12px] text-ls-secondary truncate">{r.businessId.slice(0, 20)}&hellip;</p>
+                    <Link href={`/admin/businesses/${r.businessId}/edit`} className="text-[12px] text-ls-secondary hover:text-ls-primary hover:underline truncate block">
+                      {r.businessName || r.businessId}
+                    </Link>
                     {r.text && <p className="text-[12px] text-ls-body mt-[2px] line-clamp-2">{r.text}</p>}
                   </div>
                   <div className="shrink-0 text-right">
