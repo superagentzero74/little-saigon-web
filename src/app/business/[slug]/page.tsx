@@ -40,6 +40,36 @@ function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
   );
 }
 
+function ExpandableText({ text, className }: { text: string; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el) setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [text]);
+
+  return (
+    <div>
+      <p
+        ref={ref}
+        className={`${className || ""} ${expanded ? "" : "line-clamp-3"}`}
+      >
+        {text}
+      </p>
+      {(clamped || expanded) && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[12px] font-medium text-ls-primary hover:underline mt-[2px]"
+        >
+          {expanded ? "show less" : "read more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function InteractiveStarRating({ rating, onChange }: { rating: number; onChange: (r: number) => void }) {
   return (
     <div className="flex items-center gap-xs">
@@ -606,7 +636,7 @@ export default function BusinessDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-[13px] text-ls-body mt-sm leading-relaxed">{review.text}</p>
+                  {review.text && <ExpandableText text={review.text} className="text-[13px] text-ls-body mt-sm leading-relaxed" />}
                 </div>
               ))}
             </div>
@@ -639,7 +669,7 @@ export default function BusinessDetailPage() {
                         </div>
                       </div>
                     </div>
-                    {gr.text && <p className="text-[13px] text-ls-body mt-sm leading-relaxed">{gr.text}</p>}
+                    {gr.text && <ExpandableText text={gr.text} className="text-[13px] text-ls-body mt-sm leading-relaxed" />}
                   </div>
                 ))}
               </div>
