@@ -71,6 +71,7 @@ export default function BusinessDetailPage() {
   const [showHours, setShowHours] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [googleReviews, setGoogleReviews] = useState<any[]>([]);
 
   // Check-in
   const [checkingIn, setCheckingIn] = useState(false);
@@ -96,6 +97,14 @@ export default function BusinessDetailPage() {
       ]);
       setPhotos(p);
       setReviews(r);
+
+      // Fetch Google reviews if business has a placeId
+      if (biz.placeId) {
+        fetch(`/api/places/reviews?placeId=${biz.placeId}`)
+          .then((res) => res.json())
+          .then((data) => setGoogleReviews(data.reviews || []))
+          .catch(() => {});
+      }
     } catch (err) {
       console.error("Failed to load business:", err);
     } finally {
@@ -569,14 +578,11 @@ export default function BusinessDetailPage() {
         {/* Reviews */}
         <div className="mt-xl">
           <h2 className="text-section-header text-ls-primary mb-md">
-            Reviews {reviews.length > 0 && <span className="text-ls-secondary font-normal">({reviews.length})</span>}
+            Reviews {(reviews.length + googleReviews.length) > 0 && <span className="text-ls-secondary font-normal">({reviews.length + googleReviews.length})</span>}
           </h2>
-          {reviews.length === 0 ? (
-            <div className="ls-card text-center py-xl">
-              <MessageSquare size={28} className="text-ls-secondary mx-auto" />
-              <p className="text-[14px] text-ls-secondary mt-sm">No reviews yet. Be the first!</p>
-            </div>
-          ) : (
+
+          {/* In-app reviews */}
+          {reviews.length > 0 && (
             <div className="space-y-md">
               {reviews.map((review) => (
                 <div key={review.id} className="ls-card">
@@ -603,6 +609,47 @@ export default function BusinessDetailPage() {
                   <p className="text-[13px] text-ls-body mt-sm leading-relaxed">{review.text}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Google reviews */}
+          {googleReviews.length > 0 && (
+            <div className={reviews.length > 0 ? "mt-lg" : ""}>
+              <p className="text-[12px] font-semibold text-ls-secondary mb-sm flex items-center gap-xs">
+                <img src="https://www.google.com/favicon.ico" alt="" className="w-3.5 h-3.5" /> Google Reviews
+              </p>
+              <div className="space-y-md">
+                {googleReviews.map((gr: any, i: number) => (
+                  <div key={i} className="ls-card">
+                    <div className="flex items-center gap-sm">
+                      {gr.profile_photo_url ? (
+                        <img src={gr.profile_photo_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-ls-surface flex items-center justify-center text-[13px] font-bold text-ls-secondary">
+                          {gr.author_name?.[0] || "?"}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-ls-primary truncate">{gr.author_name}</p>
+                        <div className="flex items-center gap-xs">
+                          <StarRating rating={gr.rating} size={12} />
+                          {gr.relative_time_description && (
+                            <span className="text-[11px] text-ls-secondary">{gr.relative_time_description}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {gr.text && <p className="text-[13px] text-ls-body mt-sm leading-relaxed">{gr.text}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {reviews.length === 0 && googleReviews.length === 0 && (
+            <div className="ls-card text-center py-xl">
+              <MessageSquare size={28} className="text-ls-secondary mx-auto" />
+              <p className="text-[14px] text-ls-secondary mt-sm">No reviews yet. Be the first!</p>
             </div>
           )}
         </div>
