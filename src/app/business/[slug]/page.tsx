@@ -13,7 +13,7 @@ import { isCurrentlyOpen } from "@/lib/utils";
 import {
   MapPin, Phone, Globe, Clock, Star, ChevronLeft, Heart,
   Navigation, Camera, MessageSquare, CheckCircle, X,
-  UtensilsCrossed, BookOpen, TreePine, Home, GlassWater, LayoutGrid,
+  UtensilsCrossed, BookOpen, TreePine, Home, GlassWater, LayoutGrid, Building2,
 } from "lucide-react";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -101,7 +101,7 @@ export default function BusinessDetailPage() {
   const [showHours, setShowHours] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [googleReviews, setGoogleReviews] = useState<any[]>([]);
+  // const [googleReviews, setGoogleReviews] = useState<any[]>([]);
 
   // Check-in
   const [checkingIn, setCheckingIn] = useState(false);
@@ -128,13 +128,13 @@ export default function BusinessDetailPage() {
       setPhotos(p);
       setReviews(r);
 
-      // Fetch Google reviews if business has a placeId
-      if (biz.placeId) {
-        fetch(`/api/places/reviews?placeId=${biz.placeId}`)
-          .then((res) => res.json())
-          .then((data) => setGoogleReviews(data.reviews || []))
-          .catch(() => {});
-      }
+      // Google reviews hidden
+      // if (biz.placeId) {
+      //   fetch(`/api/places/reviews?placeId=${biz.placeId}`)
+      //     .then((res) => res.json())
+      //     .then((data) => setGoogleReviews(data.reviews || []))
+      //     .catch(() => {});
+      // }
     } catch (err) {
       console.error("Failed to load business:", err);
     } finally {
@@ -181,7 +181,7 @@ export default function BusinessDetailPage() {
       );
       await checkIn(business.id, pos.coords.latitude, pos.coords.longitude);
       await refreshProfile();
-      setCheckInMsg("Checked in! +10 Đồng");
+      setCheckInMsg("Checked in! +10 points");
       setTimeout(() => setCheckInMsg(""), 3000);
     } catch (err: any) {
       setCheckInMsg(err.message || "Check-in failed");
@@ -209,7 +209,7 @@ export default function BusinessDetailPage() {
       setShowReviewForm(false);
       setReviewText("");
       setReviewRating(5);
-      setReviewMsg("Review submitted! +25 Đồng");
+      setReviewMsg("Review submitted! +25 points");
       const r = await getReviewsForBusiness(business.id);
       setReviews(r);
       setTimeout(() => setReviewMsg(""), 3000);
@@ -337,17 +337,7 @@ export default function BusinessDetailPage() {
               <div className="max-w-3xl mx-auto">
                 <h1 className="text-[56px] font-bold text-white leading-tight drop-shadow-lg">{business.name}</h1>
                 <div className="flex items-center gap-[6px] mt-[6px] flex-wrap">
-                  <div className="flex items-center gap-[2px]">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Star
-                        key={i}
-                        size={16}
-                        className={i <= Math.round(business.rating) ? "text-yellow-400 fill-yellow-400" : "text-white/40"}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-white font-semibold text-[14px]">{business.rating?.toFixed(1)}</span>
-                  <span className="text-white/70 text-[13px]">({business.totalRatings} reviews)</span>
+                  {/* Google rating hidden */}
                 </div>
                 <div className="flex items-center gap-[6px] mt-[4px] text-[13px] flex-wrap">
                   {business.priceLevel && (
@@ -608,7 +598,7 @@ export default function BusinessDetailPage() {
         {/* Reviews */}
         <div className="mt-xl">
           <h2 className="text-section-header text-ls-primary mb-md">
-            Reviews {(reviews.length + googleReviews.length) > 0 && <span className="text-ls-secondary font-normal">({reviews.length + googleReviews.length})</span>}
+            Reviews {reviews.length > 0 && <span className="text-ls-secondary font-normal">({reviews.length})</span>}
           </h2>
 
           {/* In-app reviews */}
@@ -642,41 +632,9 @@ export default function BusinessDetailPage() {
             </div>
           )}
 
-          {/* Google reviews */}
-          {googleReviews.length > 0 && (
-            <div className={reviews.length > 0 ? "mt-lg" : ""}>
-              <p className="text-[12px] font-semibold text-ls-secondary mb-sm flex items-center gap-xs">
-                <img src="https://www.google.com/favicon.ico" alt="" className="w-3.5 h-3.5" /> Google Reviews
-              </p>
-              <div className="space-y-md">
-                {googleReviews.map((gr: any, i: number) => (
-                  <div key={i} className="ls-card">
-                    <div className="flex items-center gap-sm">
-                      {gr.profile_photo_url ? (
-                        <img src={gr.profile_photo_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-ls-surface flex items-center justify-center text-[13px] font-bold text-ls-secondary">
-                          {gr.author_name?.[0] || "?"}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-ls-primary truncate">{gr.author_name}</p>
-                        <div className="flex items-center gap-xs">
-                          <StarRating rating={gr.rating} size={12} />
-                          {gr.relative_time_description && (
-                            <span className="text-[11px] text-ls-secondary">{gr.relative_time_description}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {gr.text && <ExpandableText text={gr.text} className="text-[13px] text-ls-body mt-sm leading-relaxed" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Google reviews hidden */}
 
-          {reviews.length === 0 && googleReviews.length === 0 && (
+          {reviews.length === 0 && (
             <div className="ls-card text-center py-xl">
               <MessageSquare size={28} className="text-ls-secondary mx-auto" />
               <p className="text-[14px] text-ls-secondary mt-sm">No reviews yet. Be the first!</p>
@@ -701,6 +659,16 @@ export default function BusinessDetailPage() {
             </div>
           </div>
         )}
+        {/* Claim Business */}
+        <div className="ls-card mt-xl border-0 bg-ls-surface">
+          <Link href={`/support?claim=${business.id}&name=${encodeURIComponent(business.name)}`} className="flex items-center gap-md">
+            <Building2 size={18} className="text-ls-secondary" />
+            <div className="flex-1">
+              <p className="text-[13px] font-medium text-ls-secondary">Own this business? <span className="text-ls-primary font-semibold">Claim it</span></p>
+            </div>
+            <ChevronLeft size={14} className="text-ls-secondary rotate-180" />
+          </Link>
+        </div>
       </div>
     </div>
   );

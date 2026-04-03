@@ -192,7 +192,7 @@ export default function DishDetailPage() {
     const newState = await toggleDishChecked(user.id, dish.rank);
     setIsChecked(newState);
     if (newState) {
-      setMessage("+5 Đồng earned!");
+      setMessage("+5 points earned!");
       await refreshProfile();
       setTimeout(() => setMessage(""), 3000);
     }
@@ -487,7 +487,7 @@ export default function DishDetailPage() {
                           {biz.name}
                         </p>
                         <div className="flex items-center gap-xs flex-wrap mt-[2px]">
-                          <span className="text-[12px] text-amber-500 font-semibold">★ {biz.rating.toFixed(1)}</span>
+                          {/* Google rating hidden */}
                           {dist !== null && (
                             <>
                               <span className="text-ls-border text-[10px]">·</span>
