@@ -93,9 +93,9 @@ function CategoryContent() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-[1px] bg-ls-border rounded-[8px] overflow-hidden">
           {[...Array(9)].map((_, i) => (
-            <div key={i} className="bg-white p-sm flex gap-sm">
-              <div className="w-[150px] h-[200px] rounded-[6px] bg-ls-surface animate-pulse flex-shrink-0" />
-              <div className="flex-1 py-[2px]">
+            <div key={i} className="bg-white">
+              <div className="w-full h-[150px] bg-ls-surface animate-pulse" />
+              <div className="p-sm">
                 <div className="h-3.5 bg-ls-surface rounded w-3/4 animate-pulse" />
                 <div className="h-3 bg-ls-surface rounded w-1/2 mt-[6px] animate-pulse" />
               </div>
@@ -131,16 +131,16 @@ function CompactCard({ business }: { business: Business }) {
   return (
     <Link
       href={`/business/${slug}`}
-      className="flex gap-sm p-sm bg-white hover:bg-gray-50 transition-colors overflow-hidden"
+      className="block bg-white hover:bg-gray-50 transition-colors overflow-hidden"
     >
       {/* Image */}
-      <div className="w-[150px] h-[200px] rounded-[6px] overflow-hidden bg-ls-surface flex-shrink-0">
+      <div className="w-full h-[150px] bg-ls-surface">
         {photoUrl ? (
           <Image
             src={photoUrl}
             alt={business.name}
-            width={300}
-            height={400}
+            width={400}
+            height={300}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -151,7 +151,7 @@ function CompactCard({ business }: { business: Business }) {
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0 py-[2px]">
+      <div className="p-sm">
         <div className="flex items-center gap-sm">
           <h3 className="text-[13px] font-semibold text-ls-primary truncate">{business.name}</h3>
           {business.priceLevel && (
