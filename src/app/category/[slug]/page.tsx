@@ -91,15 +91,13 @@ function CategoryContent() {
 
       {/* Results */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[1px] bg-ls-border rounded-[8px] overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-[1px] bg-ls-border rounded-[8px] overflow-hidden">
           {[...Array(9)].map((_, i) => (
-            <div key={i} className="bg-white p-sm">
-              <div className="flex gap-sm">
-                <div className="w-[56px] h-[56px] rounded-[6px] bg-ls-surface animate-pulse flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="h-3.5 bg-ls-surface rounded w-3/4 animate-pulse" />
-                  <div className="h-3 bg-ls-surface rounded w-1/2 mt-[6px] animate-pulse" />
-                </div>
+            <div key={i} className="bg-white">
+              <div className="w-full h-[150px] bg-ls-surface animate-pulse" />
+              <div className="p-sm">
+                <div className="h-3.5 bg-ls-surface rounded w-3/4 animate-pulse" />
+                <div className="h-3 bg-ls-surface rounded w-1/2 mt-[6px] animate-pulse" />
               </div>
             </div>
           ))}
@@ -114,7 +112,7 @@ function CategoryContent() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[1px] bg-ls-border rounded-[8px] overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-[1px] bg-ls-border rounded-[8px] overflow-hidden">
           {businesses.map((business) => (
             <CompactCard key={business.id} business={business} />
           ))}
@@ -133,27 +131,27 @@ function CompactCard({ business }: { business: Business }) {
   return (
     <Link
       href={`/business/${slug}`}
-      className="flex gap-sm p-sm bg-white hover:bg-gray-50 transition-colors"
+      className="block bg-white hover:bg-gray-50 transition-colors overflow-hidden"
     >
-      {/* Thumbnail */}
-      <div className="w-[56px] h-[56px] rounded-[6px] overflow-hidden bg-ls-surface flex-shrink-0">
+      {/* Image */}
+      <div className="w-full h-[150px] bg-ls-surface">
         {photoUrl ? (
           <Image
             src={photoUrl}
             alt={business.name}
-            width={112}
-            height={112}
+            width={400}
+            height={300}
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-lg">
+          <div className="w-full h-full flex items-center justify-center text-2xl">
             {catInfo?.icon || "🍜"}
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0 py-[2px]">
+      <div className="p-sm">
         <div className="flex items-center gap-sm">
           <h3 className="text-[13px] font-semibold text-ls-primary truncate">{business.name}</h3>
           {business.priceLevel && (
