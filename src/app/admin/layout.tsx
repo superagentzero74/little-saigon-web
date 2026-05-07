@@ -5,20 +5,52 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket,
+  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket, Calendar, ScanLine, Bell, Tags, Coins, Flag, Camera, FileText, Activity, Trophy, ThumbsUp, Gamepad2, TrendingUp, Heart, UtensilsCrossed, Inbox, History,
 } from "lucide-react";
 
-const NAV = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/businesses", label: "Businesses", icon: Store },
-  { href: "/admin/categories", label: "Categories", icon: FolderTree },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/reviews", label: "Reviews", icon: Star },
-  { href: "/admin/guide", label: "Food Guide", icon: BookOpen },
-  { href: "/admin/promotions", label: "Promotions", icon: Ticket },
-  { href: "/admin/claims", label: "Claims", icon: Building2 },
-  { href: "/admin/banners", label: "Promo Banners", icon: Image },
-  { href: "/admin/settings", label: "Page Settings", icon: Settings },
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+type NavGroup = { group: string; items: NavItem[] };
+
+const NAV: (NavItem | NavGroup)[] = [
+  { href: "/admin", label: "Home", icon: LayoutDashboard, exact: true },
+  { group: "Analytics & Tracking", items: [
+    { href: "/admin/analytics", label: "Analytics", icon: Activity },
+    { href: "/admin/popular", label: "Popular", icon: TrendingUp },
+    { href: "/admin/game-stats", label: "Game Stats", icon: Gamepad2 },
+    { href: "/admin/votes", label: "Votes", icon: ThumbsUp },
+    { href: "/admin/search-terms", label: "Search Terms", icon: Tags },
+    { href: "/admin/reports", label: "Reports", icon: Flag },
+  ]},
+  { group: "Content", items: [
+    { href: "/admin/businesses", label: "Businesses", icon: Store },
+    { href: "/admin/categories", label: "Categories", icon: FolderTree },
+    { href: "/admin/guide", label: "Food Guide", icon: BookOpen },
+    { href: "/admin/blog", label: "Blog", icon: FileText },
+    { href: "/admin/recipes", label: "Recipes", icon: UtensilsCrossed },
+    { href: "/admin/photo-audit", label: "Photo Manager", icon: Camera },
+    { href: "/admin/photo-feed", label: "Photo Feed", icon: Heart },
+  ]},
+  { group: "Promotions & Events", items: [
+    { href: "/admin/promotions", label: "Promotions", icon: Ticket },
+    { href: "/admin/rewards", label: "Rewards", icon: Coins },
+    { href: "/admin/challenges", label: "Challenges", icon: Trophy },
+    { href: "/admin/events", label: "Events", icon: Calendar },
+    { href: "/admin/tickets", label: "Tickets", icon: ScanLine },
+    { href: "/admin/banners", label: "Promo Banners", icon: Image },
+  ]},
+  { group: "Users & Comms", items: [
+    { href: "/admin/users", label: "Users", icon: Users },
+    { href: "/admin/reviews", label: "Reviews", icon: Star },
+    { href: "/admin/notifications", label: "Notifications", icon: Bell },
+    { href: "/admin/claims", label: "Claims", icon: Building2 },
+    { href: "/admin/inbox", label: "Inbox", icon: Inbox },
+  ]},
+  { group: "Settings", items: [
+    { href: "/admin/settings", label: "Page Settings", icon: Settings },
+  ]},
+  { group: "About", items: [
+    { href: "/admin/build-history", label: "Build History", icon: History },
+  ]},
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -62,13 +94,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className="w-[220px] shrink-0 bg-ls-primary text-white flex flex-col fixed top-0 left-0 h-full z-40">
+      <aside className="w-[220px] shrink-0 bg-ls-primary text-white flex flex-col fixed top-0 left-0 h-full" style={{ zIndex: 10000 }}>
         <div className="px-lg py-xl border-b border-white/10">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-white/50 mb-[2px]">Admin</p>
           <p className="text-[15px] font-bold">Little Saigon</p>
         </div>
         <nav className="flex-1 py-md overflow-y-auto">
-          {NAV.map(({ href, label, icon: Icon, exact }) => {
+          {NAV.map((item, idx) => {
+            if ("group" in item) {
+              return (
+                <div key={item.group} className={idx > 0 ? "mt-[6px]" : ""}>
+                  <p className="px-lg pt-[10px] pb-[4px] text-[10px] font-semibold uppercase tracking-widest text-white/35">
+                    {item.group}
+                  </p>
+                  {item.items.map(({ href, label, icon: Icon, exact }) => {
+                    const active = exact ? pathname === href : pathname.startsWith(href);
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        className={`flex items-center gap-sm px-lg py-[8px] text-[13px] font-medium transition-colors ${
+                          active ? "bg-white/15 text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        <Icon size={15} />
+                        {label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            }
+            const { href, label, icon: Icon, exact } = item;
             const active = exact ? pathname === href : pathname.startsWith(href);
             return (
               <Link

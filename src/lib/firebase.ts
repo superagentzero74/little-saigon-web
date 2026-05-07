@@ -6,10 +6,11 @@ import {
   OAuthProvider,
 } from "firebase/auth";
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: "little-saigon-c055a.firebaseapp.com",
+  authDomain: "littlesaigongo.com",
   projectId: "little-saigon-c055a",
   storageBucket: "little-saigon-c055a.firebasestorage.app",
   messagingSenderId: "570934597896",
@@ -25,4 +26,6 @@ const appleProvider = new OAuthProvider("apple.com");
 appleProvider.addScope("email");
 appleProvider.addScope("name");
 
-export { app, db, auth, storage, googleProvider, appleProvider };
+const functions = getFunctions(app);
+
+export { app, db, auth, storage, functions, googleProvider, appleProvider };

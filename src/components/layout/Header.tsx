@@ -3,16 +3,18 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard, Building2, ChevronDown } from "lucide-react";
+import { Search, Compass, BookOpen, Gift, User, LogOut, Menu, X, LayoutDashboard, Building2, ChevronDown, FileText, Home, Heart, ShoppingBag, Gamepad2, CookingPot } from "lucide-react";
 import { CATEGORIES } from "@/lib/types";
 import type { BusinessCategory, SubcategoryInfo } from "@/lib/types";
-import { getSubcategories } from "@/lib/services";
+import { getSubcategories, getAllBusinesses } from "@/lib/services";
 
 export default function Header() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
   const [showMenu, setShowMenu] = useState(false);
   const [showHamburger, setShowHamburger] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -20,10 +22,26 @@ export default function Header() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<BusinessCategory | null>(null);
   const [subcategories, setSubcategories] = useState<SubcategoryInfo[]>([]);
+  const [subCounts, setSubCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     getSubcategories().then(setSubcategories).catch(() => {});
+    // Load subcategory counts from businesses
+    getAllBusinesses().then((bizzes) => {
+      const counts: Record<string, number> = {};
+      bizzes.forEach((b) => {
+        const subs = b.subcategories as string[] | undefined;
+        if (subs) {
+          subs.forEach((s) => { counts[s] = (counts[s] || 0) + 1; });
+        }
+      });
+      setSubCounts(counts);
+    }).catch(() => {});
   }, []);
+
+  // Hide header on admin pages — admin has its own sidebar nav.
+  // (Returned AFTER all hooks so hook count stays consistent across renders.)
+  if (pathname.startsWith("/admin")) return null;
 
   const suggestedSearches = [
     "Phở", "Bánh Mì", "Bún Bò Huế", "Cơm Tấm", "Boba",
@@ -46,7 +64,7 @@ export default function Header() {
     <>
     {/* Fixed header on its own stacking layer */}
     <header className="fixed top-0 left-0 right-0 bg-white border-b border-ls-border" style={{ zIndex: 9999, isolation: "isolate" }}>
-      <div className="ls-container flex items-center gap-md h-[56px]">
+      <div className="ls-container flex items-center gap-md h-[56px] px-[20px] md:px-[16px]">
         {/* Logo — force hard navigation to home */}
         <button
           type="button"
@@ -111,9 +129,6 @@ export default function Header() {
 
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-xl ml-auto">
-          <Link href="/explore" className="flex items-center gap-xs text-meta text-ls-secondary hover:text-ls-primary transition-colors">
-            <Compass size={16} /> Explore
-          </Link>
           {loading ? (
             <div className="w-[32px] h-[32px] rounded-full bg-ls-surface animate-pulse" />
           ) : user ? (
@@ -132,7 +147,7 @@ export default function Header() {
                     {user.displayName}
                   </p>
                   <p className="text-[11px] text-ls-secondary leading-tight">
-                    {user.points} Đồng
+                    {user.points} Points
                   </p>
                 </div>
               </button>
@@ -159,7 +174,7 @@ export default function Header() {
                     )}
                     {user?.role === "business_owner" && user.ownedBusinessIds && user.ownedBusinessIds.length > 0 && (
                       <Link
-                        href={`/my-business/${user.ownedBusinessIds[0]}/edit`}
+                        href={`/my-business/${user.ownedBusinessIds[0]}`}
                         onClick={() => setShowMenu(false)}
                         className="flex items-center gap-sm px-lg py-sm text-[14px] text-ls-primary hover:bg-ls-surface transition-colors"
                       >
@@ -234,7 +249,7 @@ export default function Header() {
       </div>
 
       {/* Mobile search bar — always visible below the header row */}
-      <div className="md:hidden border-t border-ls-border bg-white px-4 py-2 relative">
+      <div className="md:hidden border-t border-ls-border bg-white px-6 py-2 relative">
         <form onSubmit={handleSearch} className="flex items-center border border-ls-border rounded-full overflow-hidden bg-gray-100 focus-within:bg-white focus-within:border-ls-primary transition-colors">
           <input
             type="text"
@@ -288,6 +303,15 @@ export default function Header() {
             <Link href="/explore" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
               <Compass size={18} /> Explore
             </Link>
+            <Link href="/games" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+              <Gamepad2 size={18} /> Games
+            </Link>
+            <Link href="/recipes" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+              <CookingPot size={18} /> Recipes
+            </Link>
+            <Link href="/blog" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
+              <FileText size={18} /> Blog
+            </Link>
             <Link href="/rewards" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
               <Gift size={18} /> Rewards
             </Link>
@@ -295,7 +319,7 @@ export default function Header() {
             {user ? (
               <>
                 <Link href="/profile" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
-                  <User size={18} /> Profile · {user.points} Đồng
+                  <User size={18} /> Profile · {user.points} Points
                 </Link>
                 {user?.role === "admin" && (
                   <Link href="/admin" onClick={() => setShowMobileNav(false)} className="flex items-center gap-sm py-sm text-[15px] text-ls-primary">
@@ -304,7 +328,7 @@ export default function Header() {
                 )}
                 {user?.role === "business_owner" && user.ownedBusinessIds && user.ownedBusinessIds.length > 0 && (
                   <Link
-                    href={`/my-business/${user.ownedBusinessIds[0]}/edit`}
+                    href={`/my-business/${user.ownedBusinessIds[0]}`}
                     onClick={() => setShowMobileNav(false)}
                     className="flex items-center gap-sm py-sm text-[15px] text-ls-primary"
                   >
@@ -328,71 +352,96 @@ export default function Header() {
       )}
     </header>
 
+    {/* Desktop Tab Bar — below header */}
+    <div
+      className="hidden md:flex fixed left-0 right-0 bg-white/90 backdrop-blur-md justify-center top-[56px]"
+      style={{ zIndex: 9998 }}
+    >
+      <nav className="flex items-center bg-gray-100 rounded-full px-[4px] py-[4px] my-[6px]">
+        {[
+          { href: "/", label: "Home" },
+          { href: "/explore", label: "Explore" },
+          { href: "/games", label: "Games" },
+          { href: "/recipes", label: "Recipes" },
+          { href: "/blog", label: "Blog" },
+          { href: "/rewards", label: "Rewards" },
+          { href: user ? "/profile" : "/login", label: "My Page" },
+          { href: "/shop", label: "Shop" },
+        ].map(({ href, label }) => {
+          const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+          return (
+            <Link
+              key={label}
+              href={href}
+              className={`px-lg py-[6px] text-[13px] font-medium rounded-full transition-colors ${
+                isActive
+                  ? "bg-white text-ls-primary shadow-sm"
+                  : "text-ls-secondary hover:text-ls-primary"
+              }`}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+
+    {/* Mobile Bottom Nav Bar — floating at bottom like iOS */}
+    <div
+      className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-ls-border pb-[env(safe-area-inset-bottom)]"
+      style={{ zIndex: 9998 }}
+    >
+      <nav className="flex items-center justify-around py-[8px] px-[8px]">
+        {[
+          { href: "/", label: "Home", Icon: Home },
+          { href: "/explore", label: "Explore", Icon: Compass },
+          { href: "/rewards", label: "Rewards", Icon: Heart },
+          { href: user ? "/profile" : "/login", label: "My Page", Icon: User },
+          { href: "/shop", label: "Shop", Icon: ShoppingBag },
+        ].map(({ href, label, Icon }) => {
+          const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+          return (
+            <Link
+              key={label}
+              href={href}
+              className={`flex flex-col items-center gap-[2px] text-[10px] font-medium transition-colors ${
+                isActive ? "text-ls-primary" : "text-ls-secondary"
+              }`}
+            >
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+
     {/* Category Nav Bar — desktop only */}
     <div
       className="hidden md:block fixed left-0 right-0 bg-white border-b border-ls-border"
-      style={{ top: 56, zIndex: 9998 }}
-      onMouseLeave={() => setHoveredCategory(null)}
+      style={{ top: 100, zIndex: 9998 }}
     >
       <div className="ls-container">
         <nav className="flex items-center gap-0" style={{ scrollbarWidth: "none" }}>
-          {(Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][]).map(([key, { label }]) => (
-            <div
+          {(Object.entries(CATEGORIES) as [BusinessCategory, { label: string; icon: string }][])
+            .filter(([key]) => !["services", "health", "entertainment"].includes(key))
+            .map(([key, { label }]) => (
+            <Link
               key={key}
-              onMouseEnter={() => setHoveredCategory(key)}
+              href={`/category/${key}`}
+              className="px-md py-[10px] text-[13px] font-medium whitespace-nowrap transition-colors border-b-2 text-ls-secondary border-transparent hover:text-ls-primary hover:border-ls-primary"
             >
-              <Link
-                href={`/category/${key}`}
-                className={`flex items-center gap-[3px] px-md py-[10px] text-[13px] font-medium whitespace-nowrap transition-colors border-b-2 ${
-                  hoveredCategory === key
-                    ? "text-ls-primary border-ls-primary"
-                    : "text-ls-secondary border-transparent hover:text-ls-primary"
-                }`}
-              >
-                {label}
-                <ChevronDown size={12} className="opacity-50" />
-              </Link>
-            </div>
+              {label}
+            </Link>
           ))}
         </nav>
       </div>
-
-      {/* Subcategory dropdown */}
-      {hoveredCategory && (() => {
-        const subs = subcategories.filter((s) => s.parentSlug === hoveredCategory && s.isActive);
-        const catLabel = CATEGORIES[hoveredCategory]?.label || "";
-        return (
-          <div className="border-t border-ls-border bg-white shadow-xl">
-            <div className="ls-container py-md">
-              {subs.length > 0 ? (
-                <div className={`grid gap-0 ${subs.length > 4 ? "grid-cols-2 max-w-[480px]" : "grid-cols-1 max-w-[240px]"}`}>
-                  {subs.map((sub) => (
-                    <Link
-                      key={sub.slug}
-                      href={`/category/${hoveredCategory}?sub=${encodeURIComponent(sub.slug)}`}
-                      className="flex items-center gap-sm px-lg py-[8px] text-[13px] text-ls-primary hover:bg-ls-surface rounded transition-colors whitespace-nowrap"
-                    >
-                      {sub.name}
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <Link
-                  href={`/category/${hoveredCategory}`}
-                  className="block px-lg py-[8px] text-[13px] text-ls-primary hover:bg-ls-surface rounded transition-colors"
-                >
-                  Browse all {catLabel.toLowerCase()}
-                </Link>
-              )}
-            </div>
-          </div>
-        );
-      })()}
     </div>
 
-    {/* Spacer to push content below the fixed header + category bar */}
-    <div className="h-[56px] md:h-[96px]" />
-    <div className="h-[52px] md:hidden" />
+    {/* Spacer to push content below the fixed header + search bar (mobile) or + tab bar + category bar (desktop) */}
+    <div className="h-[108px] md:h-[140px]" />
+    {/* Bottom spacer for mobile nav bar */}
+    <div className="h-[70px] md:h-0" />
     </>
   );
 }

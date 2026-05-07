@@ -20,7 +20,7 @@ export default function CategoryPage() {
   useEffect(() => {
     async function load() {
       try {
-        const results = await getBusinessesByCategory(category, 50);
+        const results = await getBusinessesByCategory(category, 500);
         setBusinesses(results);
       } catch (err) {
         console.error("Failed to load category:", err);

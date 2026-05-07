@@ -24,7 +24,6 @@ export default function LoginPage() {
   const [forgotSent, setForgotSent] = useState(false);
 
   const redirectAfterLogin = async () => {
-    // Check if user is admin and redirect accordingly
     const profile = await import("@/lib/services").then(m => m.getUserProfile(auth.currentUser!.uid));
     if (profile?.role === "admin") {
       router.push("/admin");
@@ -46,7 +45,16 @@ export default function LoginPage() {
       }
       await redirectAfterLogin();
     } catch (err: any) {
-      setError(err.message?.replace("Firebase: ", "") || "Something went wrong");
+      const code = err.code || "";
+      if (code.includes("invalid-credential") || code.includes("wrong-password")) {
+        setError("Incorrect email or password. Please try again.");
+      } else if (code.includes("user-not-found")) {
+        setError("No account found with this email. Try signing up.");
+      } else if (code.includes("too-many-requests")) {
+        setError("Too many attempts. Please wait a moment and try again.");
+      } else {
+        setError(err.message?.replace("Firebase: ", "") || "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
@@ -87,7 +95,7 @@ export default function LoginPage() {
     }
   };
 
-  // Forgot Password Modal
+  // Forgot Password View
   if (showForgot) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
@@ -102,7 +110,7 @@ export default function LoginPage() {
             </div>
           ) : (
             <form onSubmit={handleForgotPassword} className="mt-2xl space-y-lg">
-              <p className="text-body text-ls-secondary">Enter your email and we'll send you a link to reset your password.</p>
+              <p className="text-body text-ls-secondary">Enter your email and we&apos;ll send you a link to reset your password.</p>
               <div className="relative">
                 <Mail size={18} className="absolute left-md top-1/2 -translate-y-1/2 text-ls-secondary" />
                 <input
@@ -135,8 +143,41 @@ export default function LoginPage() {
           Sign in to check in, leave reviews, and earn rewards.
         </p>
 
+        {/* Social Buttons */}
+        <div className="space-y-md mt-2xl">
+          <button
+            onClick={handleApple}
+            className="w-full flex items-center justify-center gap-sm bg-ls-primary rounded-btn py-[12px] text-[14px] font-semibold text-white hover:opacity-90 transition-opacity"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 22" fill="currentColor">
+              <path d="M14.94 11.58c-.03-2.78 2.27-4.12 2.37-4.18-1.29-1.89-3.3-2.15-4.02-2.18-1.71-.17-3.34 1.01-4.21 1.01-.87 0-2.21-.98-3.63-.96-1.87.03-3.59 1.09-4.55 2.76-1.94 3.36-.5 8.34 1.39 11.07.92 1.34 2.02 2.84 3.47 2.78 1.39-.06 1.92-.9 3.6-.9 1.68 0 2.16.9 3.63.87 1.5-.02 2.45-1.36 3.37-2.71 1.06-1.55 1.5-3.06 1.52-3.14-.03-.01-2.92-1.12-2.95-4.44zM12.19 3.47c.77-.93 1.28-2.22 1.14-3.51-1.1.04-2.44.73-3.23 1.66-.71.82-1.33 2.13-1.16 3.39 1.23.1 2.48-.62 3.25-1.54z"/>
+            </svg>
+            Continue with Apple
+          </button>
+
+          <button
+            onClick={handleGoogle}
+            className="w-full flex items-center justify-center gap-sm bg-ls-surface rounded-btn py-[12px] text-[14px] font-semibold text-ls-primary hover:bg-ls-border transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+              <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            Continue with Google
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-md my-2xl">
+          <div className="flex-1 h-px bg-ls-border" />
+          <span className="text-tag text-ls-secondary">or</span>
+          <div className="flex-1 h-px bg-ls-border" />
+        </div>
+
         {/* Tab Picker */}
-        <div className="flex mt-2xl bg-ls-surface rounded-btn overflow-hidden">
+        <div className="flex bg-ls-surface rounded-btn overflow-hidden">
           <button
             onClick={() => { setTab("login"); setError(""); }}
             className={`flex-1 py-sm text-[14px] font-semibold transition-colors ${
@@ -156,7 +197,7 @@ export default function LoginPage() {
         </div>
 
         {/* Email Form */}
-        <form onSubmit={handleEmailAuth} className="mt-2xl space-y-md">
+        <form onSubmit={handleEmailAuth} className="mt-lg space-y-md">
           {tab === "signup" && (
             <div className="relative">
               <User size={18} className="absolute left-md top-1/2 -translate-y-1/2 text-ls-secondary" />
@@ -218,39 +259,6 @@ export default function LoginPage() {
             {loading ? "..." : tab === "login" ? "Sign In" : "Create Account"}
           </button>
         </form>
-
-        {/* Divider */}
-        <div className="flex items-center gap-md my-2xl">
-          <div className="flex-1 h-px bg-ls-border" />
-          <span className="text-tag text-ls-secondary">or continue with</span>
-          <div className="flex-1 h-px bg-ls-border" />
-        </div>
-
-        {/* Social Buttons */}
-        <div className="space-y-md">
-          <button
-            onClick={handleGoogle}
-            className="w-full flex items-center justify-center gap-sm bg-ls-surface rounded-btn py-[12px] text-[14px] font-semibold text-ls-primary hover:bg-ls-border transition-colors"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-              <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
-              <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-            </svg>
-            Continue with Google
-          </button>
-
-          <button
-            onClick={handleApple}
-            className="w-full flex items-center justify-center gap-sm bg-ls-primary rounded-btn py-[12px] text-[14px] font-semibold text-white hover:opacity-90 transition-opacity"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 22" fill="currentColor">
-              <path d="M14.94 11.58c-.03-2.78 2.27-4.12 2.37-4.18-1.29-1.89-3.3-2.15-4.02-2.18-1.71-.17-3.34 1.01-4.21 1.01-.87 0-2.21-.98-3.63-.96-1.87.03-3.59 1.09-4.55 2.76-1.94 3.36-.5 8.34 1.39 11.07.92 1.34 2.02 2.84 3.47 2.78 1.39-.06 1.92-.9 3.6-.9 1.68 0 2.16.9 3.63.87 1.5-.02 2.45-1.36 3.37-2.71 1.06-1.55 1.5-3.06 1.52-3.14-.03-.01-2.92-1.12-2.95-4.44zM12.19 3.47c.77-.93 1.28-2.22 1.14-3.51-1.1.04-2.44.73-3.23 1.66-.71.82-1.33 2.13-1.16 3.39 1.23.1 2.48-.62 3.25-1.54z"/>
-            </svg>
-            Continue with Apple
-          </button>
-        </div>
       </div>
     </div>
   );

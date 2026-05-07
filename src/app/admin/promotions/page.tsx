@@ -514,7 +514,7 @@ export default function PromotionsAdminPage() {
                     {form.type === "percent_off" ? "Discount (%)" :
                      form.type === "fixed_off" ? "Discount ($)" :
                      form.type === "free_item" || form.type === "bogo" ? "Item Description" :
-                     "Đồng Bonus"}
+                     "Points Bonus"}
                   </label>
                   {(form.type === "free_item" || form.type === "bogo") ? (
                     <input
@@ -543,11 +543,11 @@ export default function PromotionsAdminPage() {
                 </div>
               </div>
 
-              {/* Đồng Bonus (always visible for non-dong types) */}
+              {/* Points Bonus (always visible for non-dong types) */}
               {form.type !== "bonus_dong" && form.type !== "double_dong" && (
                 <div>
                   <label className="block text-[12px] font-semibold text-ls-secondary mb-xs">
-                    Đồng Bonus on Redemption
+                    Points Bonus on Redemption
                   </label>
                   <input
                     type="number"

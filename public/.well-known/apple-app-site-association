@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "65C2XKH7N4.com.productsgo.littlesaigon",
+        "paths": [
+          "/business/*",
+          "/guide/*",
+          "/share/*",
+          "/blog/*"
+        ]
+      }
+    ]
+  }
+}

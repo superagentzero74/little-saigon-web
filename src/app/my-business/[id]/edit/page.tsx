@@ -71,7 +71,18 @@ export default function OwnerEditBusinessPage() {
           : [],
       tags: biz.tags || [],
     });
-    setPhotos(pics);
+    // Merge subcollection photos with business.photos field (deduplicated)
+    const subUrls = new Set(pics.map((p) => p.url));
+    const legacyPhotos: BusinessPhoto[] = (biz.photos || [])
+      .filter((url: string) => !subUrls.has(url) && url)
+      .map((url: string, i: number) => ({
+        id: `legacy-${i}`,
+        businessId,
+        url,
+        tag: "other" as PhotoTag,
+        order: 1000 + i,
+      }));
+    setPhotos([...pics, ...legacyPhotos]);
     setLoading(false);
   }, [businessId, router]);
 

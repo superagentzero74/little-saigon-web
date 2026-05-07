@@ -1,15 +1,18 @@
 import { db, auth, storage } from "./firebase";
 import {
-  collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, writeBatch,
+  collection, collectionGroup, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, writeBatch,
   query, where, orderBy, limit, startAfter, increment, serverTimestamp,
-  DocumentSnapshot, arrayUnion, arrayRemove, getCountFromServer,
+  DocumentSnapshot, arrayUnion, arrayRemove, getCountFromServer, Timestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type {
   Business, BusinessPhoto, Review, MonVietDish, BusinessCategory,
   AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection, DishFeaturedEntry, ClaimRequest,
   SubcategoryInfo, CategoryInfo, PromoBanner, Promotion, UserOffer, OfferType, PromotionStatus, IssuanceTrigger,
+  TicketEvent, Ticket, Notification, BlogPost, BlogAuthor, MenuSection,
 } from "./types";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "./firebase";
 import { POINTS } from "./types";
 
 // ============================================
@@ -32,10 +35,33 @@ export async function getBusinesses(options?: {
 
   const q = query(collection(db, "businesses"), ...constraints);
   const snapshot = await getDocs(q);
-  const businesses = snapshot.docs
-    .map((d) => ({ id: d.id, ...d.data() })) as Business[];
-  // Sort client-side when category filter is applied
-  if (options?.category) businesses.sort((a, b) => b.rating - a.rating);
+
+  // Also query the categories array for multi-category support
+  let extraDocs: Business[] = [];
+  if (options?.category) {
+    const q2 = query(collection(db, "businesses"), where("categories", "array-contains", options.category), limit(options?.limitCount || 24));
+    const snap2 = await getDocs(q2);
+    extraDocs = snap2.docs.map((d) => ({ id: d.id, ...d.data() }) as Business);
+  }
+
+  // Merge and deduplicate
+  const seen = new Set<string>();
+  const businesses: Business[] = [];
+  for (const d of snapshot.docs) {
+    const b = { id: d.id, ...d.data() } as Business;
+    if (!seen.has(b.id)) { businesses.push(b); seen.add(b.id); }
+  }
+  for (const b of extraDocs) {
+    if (!seen.has(b.id)) { businesses.push(b); seen.add(b.id); }
+  }
+  // Sort: featured first, then by totalRatings (popularity), then rating
+  businesses.sort((a, b) => {
+    const aFeat = (a as any).isFeatured === true ? 1 : 0;
+    const bFeat = (b as any).isFeatured === true ? 1 : 0;
+    if (aFeat !== bFeat) return bFeat - aFeat;
+    if ((b.totalRatings || 0) !== (a.totalRatings || 0)) return (b.totalRatings || 0) - (a.totalRatings || 0);
+    return (b.rating || 0) - (a.rating || 0);
+  });
   return { businesses, lastDoc: snapshot.docs[snapshot.docs.length - 1] || null };
 }
 
@@ -55,7 +81,15 @@ export async function getBusinessesByCategory(category: BusinessCategory, limitC
   for (const d of [...legacySnap.docs, ...newSnap.docs]) {
     if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() } as Business);
   }
-  return Array.from(map.values()).slice(0, limitCount);
+  const results = Array.from(map.values());
+  results.sort((a, b) => {
+    const aFeat = (a as any).isFeatured === true ? 1 : 0;
+    const bFeat = (b as any).isFeatured === true ? 1 : 0;
+    if (aFeat !== bFeat) return bFeat - aFeat;
+    if ((b.totalRatings || 0) !== (a.totalRatings || 0)) return (b.totalRatings || 0) - (a.totalRatings || 0);
+    return (b.rating || 0) - (a.rating || 0);
+  });
+  return results.slice(0, limitCount);
 }
 
 export async function getTopRatedBusinesses(limitCount = 12): Promise<Business[]> {
@@ -104,12 +138,22 @@ export async function searchBusinesses(searchQuery: string): Promise<Business[]>
   const snap = await getDocs(q);
   const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
   const needle = normalizeStr(searchQuery);
-  return all.filter(
-    (b) =>
-      normalizeStr(b.name).includes(needle) ||
-      normalizeStr(b.address || "").includes(needle) ||
-      normalizeStr(b.category || "").includes(needle)
-  );
+  return all
+    .filter(
+      (b) =>
+        normalizeStr(b.name).includes(needle) ||
+        normalizeStr(b.address || "").includes(needle) ||
+        normalizeStr(b.category || "").includes(needle) ||
+        (b.tags || []).some((t) => normalizeStr(t).includes(needle))
+    )
+    .sort((a, b) => {
+      // Prioritize: featured > totalRatings (popularity) > rating
+      const aFeat = (a as any).isFeatured === true ? 1 : 0;
+      const bFeat = (b as any).isFeatured === true ? 1 : 0;
+      if (aFeat !== bFeat) return bFeat - aFeat;
+      if ((b.totalRatings || 0) !== (a.totalRatings || 0)) return (b.totalRatings || 0) - (a.totalRatings || 0);
+      return (b.rating || 0) - (a.rating || 0);
+    });
 }
 
 export async function getExistingPlaceIds(placeIds: string[]): Promise<Record<string, string>> {
@@ -136,6 +180,22 @@ export async function getExistingPlaceIds(placeIds: string[]): Promise<Record<st
 export async function getBusinessPhotos(businessId: string): Promise<BusinessPhoto[]> {
   const snap = await getDocs(collection(db, "businesses", businessId, "photos"));
   const photos = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as BusinessPhoto[];
+
+  // Fallback: if subcollection is empty, use the photos array from the business doc
+  if (photos.length === 0) {
+    const bizDoc = await getDoc(doc(db, "businesses", businessId));
+    const urls: string[] = bizDoc.data()?.photos || [];
+    return urls
+      .filter((url) => url && url.trim())
+      .map((url, i) => ({
+        id: `array_${i}`,
+        businessId,
+        url,
+        tag: "other" as const,
+        order: i,
+      }));
+  }
+
   // Sort by order field if present, otherwise by createdAt
   return photos.sort((a, b) => {
     if (a.order != null && b.order != null) return a.order - b.order;
@@ -216,7 +276,17 @@ export async function uploadBusinessPhoto(
   // Award points
   await awardPoints(user.uid, POINTS.PHOTO_UPLOAD, "photo_upload", businessId);
 
+  // Sync subcollection photos to document array for iOS compatibility
+  await syncBusinessPhotos(businessId);
+
   return { id: docRef.id, ...photoData } as BusinessPhoto;
+}
+
+/** Sync the photos subcollection URLs to the business document's photos array */
+export async function syncBusinessPhotos(businessId: string): Promise<void> {
+  const snap = await getDocs(collection(db, "businesses", businessId, "photos"));
+  const urls = snap.docs.map((d) => d.data().url).filter(Boolean);
+  await updateDoc(doc(db, "businesses", businessId), { photos: urls });
 }
 
 // ============================================
@@ -359,7 +429,7 @@ export async function createUserProfile(userId: string, data: Partial<AppUser>):
     displayName: data.displayName || "",
     email: data.email || "",
     photoURL: data.photoURL || null,
-    points: 0,
+    points: 100,
     reviewCount: 0,
     checkInCount: 0,
     role: "user",
@@ -394,6 +464,14 @@ export async function uploadUserAvatar(userId: string, file: File): Promise<stri
   const url = await getDownloadURL(storageRef);
   await updateDoc(doc(db, "users", userId), { photoURL: url, lastActive: serverTimestamp() });
   return url;
+}
+
+export async function uploadProfileImage(userId: string, file: File): Promise<string> {
+  const optimized = await optimizeImage(file);
+  const path = `users/${userId}/images/${Date.now()}.jpg`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, optimized, { contentType: "image/jpeg" });
+  return await getDownloadURL(storageRef);
 }
 
 // ============================================
@@ -484,14 +562,30 @@ export async function getUserRedemptions(userId: string): Promise<Redemption[]> 
 // Points
 // ============================================
 
-async function awardPoints(userId: string, points: number, action: string, businessId?: string): Promise<void> {
-  await updateDoc(doc(db, "users", userId), { points: increment(points) });
+const DAILY_POINTS_CAP = 500;
 
-  // Log in pointsLog (server-side collection, but we write from client for now)
+async function awardPoints(userId: string, points: number, action: string, businessId?: string): Promise<void> {
+  // Check daily cap
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayLogs = await getDocs(
+    query(
+      collection(db, "pointsLog"),
+      where("userId", "==", userId),
+      where("timestamp", ">=", Timestamp.fromDate(startOfDay))
+    )
+  );
+  const todayTotal = todayLogs.docs.reduce((sum, d) => sum + (d.data().points || 0), 0);
+  if (todayTotal >= DAILY_POINTS_CAP) return; // Cap reached
+  const awarded = Math.min(points, DAILY_POINTS_CAP - todayTotal);
+  if (awarded <= 0) return;
+
+  await updateDoc(doc(db, "users", userId), { points: increment(awarded) });
+
   await addDoc(collection(db, "pointsLog"), {
     userId,
     action,
-    points,
+    points: awarded,
     businessId: businessId || null,
     timestamp: serverTimestamp(),
   });
@@ -719,7 +813,11 @@ export async function submitClaimRequest(businessId: string, businessName: strin
 
 export async function getClaimRequests(status?: "pending" | "approved" | "denied"): Promise<ClaimRequest[]> {
   const constraints: any[] = [];
-  if (status) constraints.push(where("status", "==", status));
+  if (status === "pending") {
+    constraints.push(where("status", "in", ["pending", "new"]));
+  } else if (status) {
+    constraints.push(where("status", "==", status));
+  }
   constraints.push(orderBy("createdAt", "desc"));
   const q = query(collection(db, "claimRequests"), ...constraints);
   const snap = await getDocs(q);
@@ -1007,6 +1105,81 @@ export async function searchUsers(searchTerm: string, maxResults = 10): Promise<
     .slice(0, maxResults);
 }
 
+// ─── Ticketing ──────────────────────────────────────────
+
+export async function getEvents(): Promise<TicketEvent[]> {
+  const snap = await getDocs(collection(db, "events"));
+  const events = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TicketEvent);
+  const toMs = (ts: any) => {
+    if (!ts) return 0;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.seconds) return ts.seconds * 1000;
+    return 0;
+  };
+  events.sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt));
+  return events;
+}
+
+export async function getEvent(id: string): Promise<TicketEvent | null> {
+  const snap = await getDoc(doc(db, "events", id));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as TicketEvent;
+}
+
+export async function createTicketEvent(data: Omit<TicketEvent, "id">): Promise<string> {
+  const docRef = await addDoc(collection(db, "events"), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateTicketEvent(id: string, data: Partial<TicketEvent>): Promise<void> {
+  await updateDoc(doc(db, "events", id), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteTicketEvent(id: string): Promise<void> {
+  await deleteDoc(doc(db, "events", id));
+}
+
+export async function uploadEventPhoto(eventId: string, file: File): Promise<string> {
+  const optimized = await optimizeImage(file);
+  const path = `events/${eventId}/photos/admin_${Date.now()}.jpg`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, optimized, { contentType: "image/jpeg" });
+  return await getDownloadURL(storageRef);
+}
+
+export async function getTickets(eventId?: string): Promise<Ticket[]> {
+  let q;
+  if (eventId) {
+    q = query(collection(db, "tickets"), where("eventId", "==", eventId));
+  } else {
+    q = collection(db, "tickets");
+  }
+  const snap = await getDocs(q);
+  const tickets = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Ticket);
+  const toMs = (ts: any) => {
+    if (!ts) return 0;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.seconds) return ts.seconds * 1000;
+    return 0;
+  };
+  tickets.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
+  return tickets;
+}
+
+export async function getTicketStats() {
+  const [events, tickets] = await Promise.all([getEvents(), getTickets()]);
+  const totalRevenue = tickets.filter((t) => t.status === "active" || t.status === "used").reduce((s, t) => s + t.price, 0);
+  const checkedIn = tickets.filter((t) => t.checkedIn).length;
+  return { events: events.length, tickets: tickets.length, totalRevenue, checkedIn };
+}
+
 /** Fetch all userOffers for a given promotion (for admin stats) */
 export async function getOffersByPromotion(promotionId: string): Promise<UserOffer[]> {
   const snap = await getDocs(
@@ -1021,4 +1194,395 @@ export async function getOffersByPromotion(promotionId: string): Promise<UserOff
   };
   offers.sort((a, b) => toMs(b.issuedAt) - toMs(a.issuedAt));
   return offers;
+}
+
+// ─── Notifications ──────────────────────────────────────
+
+export async function getNotifications(max = 50): Promise<Notification[]> {
+  const q = query(collection(db, "notifications"), orderBy("sentAt", "desc"), limit(max));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification);
+}
+
+export async function sendAdminNotification(
+  title: string,
+  body: string,
+  category: "community" | "events",
+  targetType: "user" | "topic" | "all",
+  targetValue?: string,
+  imageUrl?: string,
+  scheduledFor?: string,
+  screen?: string
+): Promise<{ success: boolean; message: string }> {
+  const callable = httpsCallable(functions, "sendManualNotification");
+  const result = await callable({ title, body, category, targetType, targetValue, imageUrl, scheduledFor, screen });
+  return result.data as { success: boolean; message: string };
+}
+
+// ─── Search Terms / Keywords ─────────────────────────────
+
+export async function getBusinessesByKeyword(keyword: string): Promise<Business[]> {
+  const q = query(collection(db, "businesses"), where("keywords", "array-contains", keyword));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Business);
+}
+
+export async function addKeywordToBusiness(businessId: string, keyword: string): Promise<void> {
+  await updateDoc(doc(db, "businesses", businessId), {
+    keywords: arrayUnion(keyword),
+  });
+}
+
+export async function removeKeywordFromBusiness(businessId: string, keyword: string): Promise<void> {
+  await updateDoc(doc(db, "businesses", businessId), {
+    keywords: arrayRemove(keyword),
+  });
+}
+
+export async function searchBusinessesByName(name: string, max = 10): Promise<Business[]> {
+  // Firestore doesn't support full-text search, so we fetch all and filter client-side
+  // For production, consider Algolia or Typesense
+  const snap = await getDocs(query(collection(db, "businesses"), limit(500)));
+  const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Business);
+  const q = name.toLowerCase();
+  return all.filter((b) => b.name.toLowerCase().includes(q)).slice(0, max);
+}
+
+export async function uploadNotificationImage(file: File): Promise<string> {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `notifications/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
+}
+
+export async function searchUserByEmail(email: string): Promise<AppUser[]> {
+  const q = query(collection(db, "users"), where("email", "==", email), limit(5));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as AppUser);
+}
+
+// ─── Rewards Stats ──────────────────────────────────
+
+export async function getDongStats() {
+  const [usersSnap, checkInsSnap, redemptionsSnap, pointsLogSnap, promotionsSnap, offersSnap] = await Promise.all([
+    getDocs(collection(db, "users")),
+    getDocs(collection(db, "checkIns")),
+    getDocs(collection(db, "redemptions")),
+    getDocs(collection(db, "pointsLog")),
+    getDocs(collection(db, "promotions")),
+    getDocs(collection(db, "userOffers")),
+  ]);
+
+  const users = usersSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+  const checkIns = checkInsSnap.docs.map(d => d.data());
+  const redemptions = redemptionsSnap.docs.map(d => d.data());
+  const pointsLog = pointsLogSnap.docs.map(d => d.data());
+  const promotions = promotionsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const offers = offersSnap.docs.map(d => d.data());
+
+  // Total dong in circulation (sum of all user points)
+  const totalInCirculation = users.reduce((s: number, u: any) => s + (u.points || 0), 0);
+
+  // Total dong ever issued (sum of all pointsLog entries)
+  const totalIssued = pointsLog.reduce((s: number, p: any) => s + (p.points || 0), 0);
+
+  // Total dong redeemed/spent
+  const totalRedeemed = redemptions.length;
+
+  // Breakdown by action type
+  const byAction: Record<string, { count: number; total: number }> = {};
+  pointsLog.forEach((p: any) => {
+    const action = p.action || "unknown";
+    if (!byAction[action]) byAction[action] = { count: 0, total: 0 };
+    byAction[action].count++;
+    byAction[action].total += p.points || 0;
+  });
+
+  // Top earners
+  const topEarners = [...users]
+    .sort((a: any, b: any) => (b.points || 0) - (a.points || 0))
+    .slice(0, 10)
+    .map((u: any) => ({ id: u.id, name: u.displayName, email: u.email, points: u.points || 0, checkIns: u.checkInCount || 0, reviews: u.reviewCount || 0 }));
+
+  // Active users (have points > 0)
+  const activeUsers = users.filter((u: any) => (u.points || 0) > 0).length;
+
+  // Offers stats
+  const offersIssued = offers.length;
+  const offersRedeemed = offers.filter((o: any) => o.status === "redeemed").length;
+  const activePromotions = promotions.filter((p: any) => p.status === "active").length;
+
+  // Recent activity (last 20 pointsLog entries)
+  const recentActivity = pointsLog
+    .sort((a: any, b: any) => {
+      const tsA = a.timestamp?.seconds || 0;
+      const tsB = b.timestamp?.seconds || 0;
+      return tsB - tsA;
+    })
+    .slice(0, 20);
+
+  // Daily & weekly stats
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+  const weekStart = todayStart - (6 * 86400); // 7 days ago
+
+  const todayLog = pointsLog.filter((p: any) => (p.timestamp?.seconds || 0) >= todayStart);
+  const weekLog = pointsLog.filter((p: any) => (p.timestamp?.seconds || 0) >= weekStart);
+  const todayCheckIns = checkIns.filter((c: any) => (c.timestamp?.seconds || c.createdAt?.seconds || 0) >= todayStart);
+  const weekCheckIns = checkIns.filter((c: any) => (c.timestamp?.seconds || c.createdAt?.seconds || 0) >= weekStart);
+
+  const todayDong = todayLog.reduce((s: number, p: any) => s + (p.points || 0), 0);
+  const weekDong = weekLog.reduce((s: number, p: any) => s + (p.points || 0), 0);
+
+  // Unique active users today/week
+  const todayActiveUsers = new Set(todayLog.map((p: any) => p.userId)).size;
+  const weekActiveUsers = new Set(weekLog.map((p: any) => p.userId)).size;
+
+  // Daily breakdown by action
+  const todayByAction: Record<string, { count: number; total: number }> = {};
+  todayLog.forEach((p: any) => {
+    const action = p.action || "unknown";
+    if (!todayByAction[action]) todayByAction[action] = { count: 0, total: 0 };
+    todayByAction[action].count++;
+    todayByAction[action].total += p.points || 0;
+  });
+
+  const weekByAction: Record<string, { count: number; total: number }> = {};
+  weekLog.forEach((p: any) => {
+    const action = p.action || "unknown";
+    if (!weekByAction[action]) weekByAction[action] = { count: 0, total: 0 };
+    weekByAction[action].count++;
+    weekByAction[action].total += p.points || 0;
+  });
+
+  return {
+    totalInCirculation,
+    totalIssued,
+    totalRedeemed,
+    totalUsers: users.length,
+    activeUsers,
+    totalCheckIns: checkIns.length,
+    byAction,
+    topEarners,
+    activePromotions,
+    totalPromotions: promotions.length,
+    offersIssued,
+    offersRedeemed,
+    recentActivity,
+    // Daily
+    todayDong,
+    todayActions: todayLog.length,
+    todayCheckIns: todayCheckIns.length,
+    todayActiveUsers,
+    todayByAction,
+    // Weekly
+    weekDong,
+    weekActions: weekLog.length,
+    weekCheckIns: weekCheckIns.length,
+    weekActiveUsers,
+    weekByAction,
+  };
+}
+
+// ============================================
+// Featured / Active Users (for explore page)
+// ============================================
+
+export async function getActiveUsers(limitCount = 6): Promise<AppUser[]> {
+  const snap = await getDocs(query(collection(db, "users"), limit(100)));
+  const users = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as AppUser);
+  // Sort by activity: reviews + check-ins + favorite spots
+  users.sort((a, b) => {
+    const aScore = (a.reviewCount || 0) + (a.checkInCount || 0) + Object.values(a.favoriteSpots || {}).flat().length;
+    const bScore = (b.reviewCount || 0) + (b.checkInCount || 0) + Object.values(b.favoriteSpots || {}).flat().length;
+    return bScore - aScore;
+  });
+  // Only return users with at least some activity
+  return users.filter((u) => (u.reviewCount || 0) + (u.checkInCount || 0) > 0).slice(0, limitCount);
+}
+
+// ============================================
+// User Photos (collection group query across all business photo subcollections)
+// ============================================
+
+export async function getUserPhotos(userId: string, limitCount = 20): Promise<BusinessPhoto[]> {
+  const q = query(
+    collectionGroup(db, "photos"),
+    where("userId", "==", userId),
+    limit(limitCount)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BusinessPhoto);
+}
+
+// ============================================
+// Follows
+// ============================================
+
+export async function toggleFollow(currentUserId: string, targetUserId: string): Promise<boolean> {
+  if (currentUserId === targetUserId) return false;
+  const followId = `${currentUserId}_${targetUserId}`;
+  const followRef = doc(db, "follows", followId);
+  const snap = await getDoc(followRef);
+  const batch = writeBatch(db);
+
+  if (snap.exists()) {
+    batch.delete(followRef);
+    batch.update(doc(db, "users", targetUserId), { followerCount: increment(-1) });
+    batch.update(doc(db, "users", currentUserId), { followingCount: increment(-1) });
+    await batch.commit();
+    return false;
+  } else {
+    batch.set(followRef, {
+      followerId: currentUserId,
+      followeeId: targetUserId,
+      createdAt: serverTimestamp(),
+    });
+    batch.update(doc(db, "users", targetUserId), { followerCount: increment(1) });
+    batch.update(doc(db, "users", currentUserId), { followingCount: increment(1) });
+    await batch.commit();
+    return true;
+  }
+}
+
+export async function isFollowing(currentUserId: string, targetUserId: string): Promise<boolean> {
+  const snap = await getDoc(doc(db, "follows", `${currentUserId}_${targetUserId}`));
+  return snap.exists();
+}
+
+// ============================================
+// Public User Profile (for share pages)
+// ============================================
+
+export async function getPublicUserProfile(userId: string): Promise<{
+  displayName: string;
+  photoURL?: string;
+  headline?: string;
+  city?: string;
+  state?: string;
+  profileImages?: string[];
+  reviewCount: number;
+  checkInCount: number;
+  followerCount: number;
+  followingCount: number;
+  favoriteSpots?: Record<string, string[]>;
+} | null> {
+  const snap = await getDoc(doc(db, "users", userId));
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  return {
+    displayName: d.displayName || "Little Saigon User",
+    photoURL: d.photoURL,
+    headline: d.headline,
+    city: d.city,
+    state: d.state,
+    profileImages: d.profileImages,
+    reviewCount: d.reviewCount || 0,
+    checkInCount: d.checkInCount || 0,
+    followerCount: d.followerCount || 0,
+    followingCount: d.followingCount || 0,
+    favoriteSpots: d.favoriteSpots,
+  };
+}
+
+// ============================================
+// Blog Authors
+// ============================================
+
+export async function getBlogAuthor(slug: string): Promise<BlogAuthor | null> {
+  const snap = await getDoc(doc(db, "blogAuthors", slug));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as BlogAuthor;
+}
+
+export async function getBlogAuthors(): Promise<BlogAuthor[]> {
+  const snap = await getDocs(collection(db, "blogAuthors"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BlogAuthor);
+}
+
+// ============================================
+// Blog Posts
+// ============================================
+
+export async function getBlogPosts(opts?: { status?: string; limitCount?: number }): Promise<BlogPost[]> {
+  const constraints: any[] = [];
+  if (opts?.status) constraints.push(where("status", "==", opts.status));
+  const q = query(collection(db, "blogPosts"), ...constraints);
+  const snap = await getDocs(q);
+  const posts = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BlogPost);
+  posts.sort((a, b) => {
+    const aTime = a.publishedAt?.seconds || a.createdAt?.seconds || 0;
+    const bTime = b.publishedAt?.seconds || b.createdAt?.seconds || 0;
+    return bTime - aTime;
+  });
+  return opts?.limitCount ? posts.slice(0, opts.limitCount) : posts;
+}
+
+export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
+  const q = query(collection(db, "blogPosts"), where("slug", "==", slug), limit(1));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as BlogPost;
+}
+
+export async function createBlogPost(data: Partial<BlogPost>): Promise<string> {
+  const docRef = await addDoc(collection(db, "blogPosts"), {
+    ...data,
+    images: data.images || [],
+    tags: data.tags || [],
+    status: data.status || "draft",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateBlogPost(id: string, data: Partial<BlogPost>): Promise<void> {
+  await updateDoc(doc(db, "blogPosts", id), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteBlogPost(id: string): Promise<void> {
+  await deleteDoc(doc(db, "blogPosts", id));
+}
+
+export async function uploadBlogImage(postId: string, file: File): Promise<string> {
+  const optimized = await optimizeImage(file);
+  const path = `blog/${postId}/images/${Date.now()}.jpg`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, optimized, { contentType: "image/jpeg" });
+  return await getDownloadURL(storageRef);
+}
+
+// ============================================
+// Menu
+// ============================================
+
+export async function getMenuSections(businessId: string): Promise<MenuSection[]> {
+  const q = query(
+    collection(db, "businesses", businessId, "menuSections"),
+    orderBy("order", "asc")
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as MenuSection);
+}
+
+export async function createMenuSection(businessId: string, data: Omit<MenuSection, "id">): Promise<string> {
+  const docRef = await addDoc(collection(db, "businesses", businessId, "menuSections"), data);
+  return docRef.id;
+}
+
+export async function updateMenuSection(businessId: string, sectionId: string, data: Partial<Omit<MenuSection, "id">>): Promise<void> {
+  await updateDoc(doc(db, "businesses", businessId, "menuSections", sectionId), data);
+}
+
+export async function deleteMenuSection(businessId: string, sectionId: string): Promise<void> {
+  await deleteDoc(doc(db, "businesses", businessId, "menuSections", sectionId));
+}
+
+export async function updateMenuImage(businessId: string, url: string | null): Promise<void> {
+  await updateDoc(doc(db, "businesses", businessId), { menuImageUrl: url });
 }

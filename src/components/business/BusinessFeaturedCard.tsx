@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import OptImage from "@/components/ui/OptImage";
 import type { Business } from "@/lib/types";
 import { businessSlug, formatRating } from "@/lib/utils";
 import { getCategoryInfo } from "@/lib/types";
@@ -20,19 +20,19 @@ export default function BusinessFeaturedCard({ business }: BusinessFeaturedCardP
       className="block w-[200px] flex-shrink-0 group"
     >
       {/* Image */}
-      <div className="w-full h-[140px] rounded-card overflow-hidden bg-ls-surface border border-ls-border">
-        {photoUrl ? (
-          <Image
+      <div className="relative w-full h-[140px] rounded-card overflow-hidden bg-ls-surface border border-ls-border">
+        <div className="absolute inset-0 flex items-center justify-center text-3xl">
+          {catInfo?.icon || "🍜"}
+        </div>
+        {photoUrl && (
+          <OptImage
             src={photoUrl}
             alt={business.name}
             width={400}
             height={280}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            sizes="200px"
+            className="relative w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-3xl">
-            {catInfo?.icon || "🍜"}
-          </div>
         )}
       </div>
 

@@ -55,6 +55,13 @@ export default function GuideAdminPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
 
+  // Edit dish state
+  const [editingDish, setEditingDish] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEnglish, setEditEnglish] = useState("");
+  const [editSearch, setEditSearch] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // Hero image state
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageMsg, setImageMsg] = useState("");
@@ -178,6 +185,36 @@ export default function GuideAdminPage() {
       console.error("Add food failed:", err);
     } finally {
       setAddingFood(false);
+    }
+  };
+
+  const startEditDish = (d: MonVietDish) => {
+    setEditingDish(d.id);
+    setEditName(d.name);
+    setEditEnglish(d.englishName);
+    setEditSearch(d.searchQuery || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingDish || !editName.trim() || !editEnglish.trim()) return;
+    setSavingEdit(true);
+    try {
+      await updateFood(editingDish, {
+        vietnameseName: editName.trim(),
+        englishName: editEnglish.trim(),
+        searchQuery: editSearch.trim(),
+      });
+      setDishes((prev) => prev.map((d) =>
+        d.id === editingDish ? { ...d, name: editName.trim(), englishName: editEnglish.trim(), searchQuery: editSearch.trim() } : d
+      ));
+      if (selectedDish?.id === editingDish) {
+        setSelectedDish((prev) => prev ? { ...prev, name: editName.trim(), englishName: editEnglish.trim(), searchQuery: editSearch.trim() } : prev);
+      }
+      setEditingDish(null);
+    } catch (err) {
+      console.error("Edit failed:", err);
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -352,10 +389,70 @@ export default function GuideAdminPage() {
             <div>
               {/* Food header */}
               <div className="mb-xl pb-xl border-b border-ls-border">
-                <h2 className="text-section-header text-ls-primary">
-                  #{selectedDish.rank} {selectedDish.name}
-                </h2>
-                <p className="text-meta text-ls-secondary">{selectedDish.englishName}</p>
+                {editingDish === selectedDish.id ? (
+                  <div className="space-y-sm">
+                    <div>
+                      <label className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">Vietnamese Name</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full border border-ls-border rounded-btn px-md py-sm text-[15px] font-semibold focus:outline-none focus:border-ls-primary mt-[2px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">English Name</label>
+                      <input
+                        type="text"
+                        value={editEnglish}
+                        onChange={(e) => setEditEnglish(e.target.value)}
+                        className="w-full border border-ls-border rounded-btn px-md py-sm text-[14px] focus:outline-none focus:border-ls-primary mt-[2px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">Search Query</label>
+                      <input
+                        type="text"
+                        value={editSearch}
+                        onChange={(e) => setEditSearch(e.target.value)}
+                        placeholder="Used to find matching businesses"
+                        className="w-full border border-ls-border rounded-btn px-md py-sm text-[14px] focus:outline-none focus:border-ls-primary mt-[2px]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-sm">
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={savingEdit || !editName.trim() || !editEnglish.trim()}
+                        className="ls-btn text-[12px] flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {savingEdit ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        {savingEdit ? "Saving..." : "Save"}
+                      </button>
+                      <button onClick={() => setEditingDish(null)} className="text-[12px] text-ls-secondary hover:text-ls-primary">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-section-header text-ls-primary">
+                        #{selectedDish.rank} {selectedDish.name}
+                      </h2>
+                      <p className="text-meta text-ls-secondary">{selectedDish.englishName}</p>
+                      {selectedDish.searchQuery && (
+                        <p className="text-[11px] text-ls-secondary mt-xs">Search: {selectedDish.searchQuery}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => startEditDish(selectedDish)}
+                      className="text-ls-secondary hover:text-ls-primary p-xs shrink-0"
+                      title="Edit name"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Hero Image Upload */}

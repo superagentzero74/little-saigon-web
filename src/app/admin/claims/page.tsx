@@ -8,11 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getClaimRequests, approveClaimRequest, denyClaimRequest } from "@/lib/services";
 import type { ClaimRequest } from "@/lib/types";
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; className: string; icon: typeof Clock }> = {
+  new: { label: "New", className: "bg-blue-100 text-blue-700", icon: Clock },
   pending: { label: "Pending", className: "bg-amber-100 text-amber-700", icon: Clock },
   approved: { label: "Approved", className: "bg-green-100 text-green-700", icon: CheckCircle },
   denied: { label: "Denied", className: "bg-red-100 text-red-600", icon: XCircle },
 };
+const DEFAULT_STATUS_CONFIG = { label: "Unknown", className: "bg-gray-100 text-gray-600", icon: Clock };
 
 export default function ClaimsAdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -70,11 +72,11 @@ export default function ClaimsAdminPage() {
     }
   };
 
-  if (authLoading) return <div className="ls-container py-3xl text-ls-secondary">Loading...</div>;
+  if (authLoading) return <div className="p-2xl text-ls-secondary">Loading...</div>;
   if (!user || user.role !== "admin") return null;
 
   return (
-    <div className="ls-container py-2xl">
+    <div className="p-2xl">
       {/* Header */}
       <div className="mb-2xl">
         <div className="flex items-center gap-sm mb-xs">
@@ -119,7 +121,7 @@ export default function ClaimsAdminPage() {
       ) : (
         <div className="space-y-md">
           {claims.map((claim) => {
-            const statusConf = STATUS_CONFIG[claim.status];
+            const statusConf = STATUS_CONFIG[claim.status] || DEFAULT_STATUS_CONFIG;
             const StatusIcon = statusConf.icon;
             const isActing = actionLoading === claim.id;
 
@@ -142,7 +144,7 @@ export default function ClaimsAdminPage() {
 
                     <div className="flex items-center gap-sm text-[12px] text-ls-secondary mb-sm">
                       <User size={12} className="shrink-0" />
-                      <span>{claim.userName}</span>
+                      <span>{claim.userName || "—"}</span>
                       <span>·</span>
                       <span>{claim.userEmail}</span>
                     </div>
@@ -164,7 +166,7 @@ export default function ClaimsAdminPage() {
                   </div>
 
                   {/* Actions */}
-                  {claim.status === "pending" && (
+                  {(claim.status === "pending" || claim.status === "new") && (
                     <div className="flex gap-sm shrink-0">
                       <button
                         onClick={() => handleApprove(claim)}

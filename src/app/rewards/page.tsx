@@ -100,18 +100,41 @@ export default function RewardsPage() {
 
   return (
     <div className="ls-container py-3xl max-w-2xl mx-auto">
+      {/* Banner */}
+      <div className="mb-xl">
+        <img src="/images/rewards-banner.png" alt="Rewards" className="w-full max-w-lg mx-auto" />
+      </div>
+
       {/* Header */}
       <div className="text-center mb-3xl">
-        <Gift size={36} className="text-ls-primary mx-auto" />
-        <h1 className="text-page-title text-ls-primary mt-md">Rewards</h1>
-        <p className="text-body text-ls-secondary mt-xs">
-          Earn Đồng by checking in, leaving reviews, and uploading photos.
+        <p className="text-[16px] font-semibold text-ls-primary">
+          Earn points for every Little Saigon moment.
         </p>
+        <p className="text-body text-ls-secondary mt-xs max-w-md mx-auto">
+          Leave a review. Check in to your favorite spots. Share a photo. Every action earns you points — redeemable for merch and free food at restaurants across the community.
+        </p>
+
+        {/* Earn actions grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-md mt-xl text-left">
+          {[
+            { icon: "✍", title: "Write a review", pts: "+25 pts", desc: "Share your honest experience at any listed business." },
+            { icon: "📍", title: "Check in", pts: "+10 pts", desc: "Let the community know you're there. Check in daily." },
+            { icon: "📷", title: "Upload a photo", pts: "+15 pts", desc: "Add photos of dishes, storefronts, and events." },
+            { icon: "★", title: "Attend an event", pts: "+500 pts", desc: "Highest reward. Verified QR check-in at community events." },
+          ].map((item) => (
+            <div key={item.title} className="bg-ls-surface rounded-card p-lg">
+              <span className="text-[22px] block mb-sm">{item.icon}</span>
+              <p className="text-[14px] font-semibold text-ls-primary">{item.title}</p>
+              <p className="text-[13px] font-medium text-amber-700 mt-[2px]">{item.pts}</p>
+              <p className="text-[12px] text-ls-secondary mt-sm leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
         {user && (
           <div className="mt-lg inline-flex items-center gap-sm bg-ls-surface rounded-pill px-xl py-sm">
             <Award size={18} className="text-ls-primary" />
             <span className="text-[18px] font-bold text-ls-primary">{user.points}</span>
-            <span className="text-meta text-ls-secondary">Đồng available</span>
+            <span className="text-meta text-ls-secondary">points</span>
           </div>
         )}
       </div>
@@ -220,7 +243,7 @@ export default function RewardsPage() {
                           )}
                           {promo.dongBonus > 0 && (
                             <span className="text-[11px] font-semibold text-ls-primary">
-                              +{promo.dongBonus} Đồng
+                              +{promo.dongBonus} points
                             </span>
                           )}
                         </div>
@@ -243,7 +266,7 @@ export default function RewardsPage() {
 
       {/* How to Earn */}
       <div className="mb-3xl">
-        <h2 className="text-section-header text-ls-primary mb-lg">How to Earn Đồng</h2>
+        <h2 className="text-section-header text-ls-primary mb-lg">How to Earn Points</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
           {[
             { icon: <Star size={20} />, label: "Write a Review", pts: POINTS.REVIEW },
@@ -258,7 +281,7 @@ export default function RewardsPage() {
               <div className="flex-1">
                 <p className="text-[14px] font-semibold text-ls-primary">{item.label}</p>
               </div>
-              <span className="text-meta font-bold text-ls-primary">+{item.pts} Đồng</span>
+              <span className="text-meta font-bold text-ls-primary">+{item.pts} points</span>
             </div>
           ))}
         </div>
@@ -282,7 +305,7 @@ export default function RewardsPage() {
           <div className="ls-card text-center py-2xl">
             <Gift size={32} className="text-ls-secondary mx-auto" />
             <p className="text-body text-ls-secondary mt-md">
-              No rewards available right now. Keep earning Đồng!
+              No rewards available right now. Keep earning points!
             </p>
           </div>
         ) : (
@@ -297,7 +320,7 @@ export default function RewardsPage() {
                       <p className="text-body text-ls-body mt-xs">{reward.description}</p>
                     </div>
                     <span className="text-meta font-bold text-ls-primary whitespace-nowrap ml-md">
-                      {reward.pointsCost} Đồng
+                      {reward.pointsCost} points
                     </span>
                   </div>
                   <button
@@ -309,7 +332,7 @@ export default function RewardsPage() {
                         : "bg-ls-surface text-ls-secondary cursor-not-allowed"
                     }`}
                   >
-                    {redeeming === reward.id ? "Redeeming..." : canAfford ? "Redeem" : "Not enough Đồng"}
+                    {redeeming === reward.id ? "Redeeming..." : canAfford ? "Redeem" : "Not enough points"}
                   </button>
                 </div>
               );
@@ -349,6 +372,10 @@ export default function RewardsPage() {
           </button>
         </div>
       )}
+      {/* Disclaimer */}
+      <p className="text-[11px] text-ls-secondary text-center mt-3xl leading-relaxed max-w-md mx-auto">
+        Reward points have no cash value and cannot be transferred or sold. Points are redeemable only for eligible rewards within the Little Saigon app. Participating businesses and redemption options are subject to change. Daily earning cap: 500 points per user per day.
+      </p>
     </div>
   );
 }

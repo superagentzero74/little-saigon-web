@@ -3,6 +3,13 @@
 // Matches Firestore schema from BLUEPRINT.md
 // ============================================
 
+// Re-export recipe types
+export type {
+  Recipe, BilingualText, RecipeCategory, RecipeCuisine, RecipeRegion,
+  RecipeDifficulty, RecipeStatus, Ingredient, Step, Tip, ImageRef,
+  IngredientUnit, IngredientCategory, TipType,
+} from "./types/recipe";
+
 // Legacy single-value category (kept for backward compat during migration)
 export type LegacyBusinessCategory =
   | "restaurant"
@@ -88,7 +95,10 @@ export interface Business {
   longitude: number;
   placeId?: string;
   tags?: string[];
+  keywords?: string[];
+  logoURL?: string;
   ownerId?: string;
+  menuImageUrl?: string;
   createdAt?: any;
   updatedAt?: any;
 }
@@ -100,7 +110,7 @@ export interface ClaimRequest {
   userId: string;
   userName: string;
   userEmail: string;
-  status: "pending" | "approved" | "denied";
+  status: "new" | "pending" | "approved" | "denied";
   note?: string;
   createdAt?: any;
   reviewedAt?: any;
@@ -111,11 +121,13 @@ export interface BusinessPhoto {
   id: string;
   businessId: string;
   userId?: string;
+  userName?: string;
   url: string;
   tag: PhotoTag;
   foodTags?: string[];
   description?: string;
   order?: number;
+  feedApproved?: boolean;
   createdAt?: any;
 }
 
@@ -157,6 +169,17 @@ export interface AppUser {
   city?: string;
   state?: string;
   website?: string;
+  // New profile fields
+  headline?: string;
+  aboutMe?: string;
+  hometown?: string;
+  profileImages?: string[];
+  favoriteSpots?: Record<string, string[]>;
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  followerCount?: number;
+  followingCount?: number;
 }
 
 export interface CheckIn {
@@ -285,6 +308,28 @@ export function getCategoryInfo(business: { category?: string; categories?: stri
   return { label: "Business", icon: "🏢" };
 }
 
+/** Get all category infos for a business (supports multiple categories) */
+export function getAllCategoryInfos(business: { category?: string; categories?: string[] }): { label: string; icon: string }[] {
+  const results: { label: string; icon: string }[] = [];
+  const seen = new Set<string>();
+
+  if (business.categories && business.categories.length > 0) {
+    for (const cat of business.categories) {
+      const info = CATEGORIES[cat as BusinessCategory];
+      if (info && !seen.has(cat)) {
+        results.push(info);
+        seen.add(cat);
+      }
+    }
+  }
+
+  if (results.length === 0) {
+    results.push(getCategoryInfo(business));
+  }
+
+  return results;
+}
+
 export interface DishFeaturedEntry {
   businessId: string;
   rank: number;
@@ -324,8 +369,8 @@ export const OFFER_TYPES: Record<OfferType, { label: string; icon: string }> = {
   percent_off: { label: "% Off", icon: "Percent" },
   fixed_off: { label: "$ Off", icon: "DollarSign" },
   free_item: { label: "Free Item", icon: "Gift" },
-  double_dong: { label: "2x Đồng", icon: "ArrowUpRight" },
-  bonus_dong: { label: "Bonus Đồng", icon: "PlusCircle" },
+  double_dong: { label: "2x Points", icon: "ArrowUpRight" },
+  bonus_dong: { label: "Bonus Points", icon: "PlusCircle" },
   bogo: { label: "BOGO", icon: "Copy" },
 };
 
@@ -400,4 +445,137 @@ export interface UserOffer {
   scannedByOwnerId?: string | null;
   qrPayload: string;
   qrNonce: string;
+}
+
+// ─── Ticketing ──────────────────────────────────────────
+
+export interface EventTier {
+  id: string;
+  name: string;
+  price: number;       // USD cents
+  available: number;
+  description?: string;
+}
+
+export interface TicketEvent {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  color: string;
+  date: string;
+  dateTimestamp?: any;
+  time: string;
+  venue: string;
+  location: string;
+  businessId?: string | null;
+  capacity: number;
+  sold: number;
+  tiers: EventTier[];
+  tags: string[];
+  category: string;
+  refundPolicy: string;
+  status: "draft" | "active" | "paused" | "ended";
+  isPublic: boolean;
+  photos?: string[];
+  createdBy?: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface Ticket {
+  id: string;
+  ticketCode: string;
+  userId: string;
+  attendeeName: string;
+  attendeeEmail: string;
+  eventId: string;
+  eventName: string;
+  eventEmoji: string;
+  eventDate: string;
+  eventTime: string;
+  eventVenue: string;
+  eventColor: string;
+  tier: string;
+  price: number;
+  status: "active" | "used" | "refunded" | "transferred";
+  checkedIn: boolean;
+  checkedInAt?: any;
+  checkedInBy?: string | null;
+  qrPayload: string;
+  qrNonce: string;
+  createdAt?: any;
+}
+
+// ─── Notifications ──────────────────────────────────────
+
+export interface Notification {
+  id: string;
+  userId?: string | null;
+  title: string;
+  body: string;
+  category: "community" | "events";
+  type: string;
+  data?: Record<string, string>;
+  sentAt?: any;
+  imageUrl?: string | null;
+  scheduledFor?: any;
+  sentBy?: string;
+  status: "sent" | "failed" | "scheduled";
+  targetType: "user" | "topic" | "all";
+  targetValue?: string | null;
+}
+
+// ─── Menu ──────────────────────────────────────────────
+
+export interface MenuPriceOption {
+  label: string;   // e.g. "2pc", "3pc", "4pc"
+  price: number;
+}
+
+export interface MenuItem {
+  id: string;
+  name: string;
+  nameVi?: string;
+  description?: string;
+  price?: number;
+  priceNote?: string;
+  priceOptions?: MenuPriceOption[];
+  photoUrl?: string;
+  tags: string[];
+  available: boolean;
+}
+
+export interface MenuSection {
+  id: string;
+  name: string;
+  nameVi?: string;
+  order: number;
+  items: MenuItem[];
+}
+
+export interface BlogAuthor {
+  id: string;
+  name: string;
+  slug: string;
+  bio: string;
+  avatarURL?: string;
+  expertise: string[];
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  body: string;              // Markdown content
+  excerpt?: string;
+  coverImageURL?: string;
+  images: string[];
+  author: string;
+  authorSlug?: string;
+  tags: string[];
+  status: "draft" | "published";
+  publishedAt?: any;
+  createdAt?: any;
+  updatedAt?: any;
 }

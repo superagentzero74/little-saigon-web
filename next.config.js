@@ -1,6 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: "/__/auth/:path*",
+        destination: "https://little-saigon-c055a.firebaseapp.com/__/auth/:path*",
+      },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: "/.well-known/apple-app-site-association",
+        headers: [
+          { key: "Content-Type", value: "application/json" },
+        ],
+      },
+    ];
+  },
   images: {
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [96, 128, 256, 384, 512],
     remotePatterns: [
       {
         protocol: "https",
@@ -25,6 +46,10 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "little-saigon-c055a.firebasestorage.app",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.shopify.com",
       },
     ],
   },

@@ -3,12 +3,15 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import OptImage from "@/components/ui/OptImage";
 import Link from "next/link";
 import {
   ChevronLeft, ChevronRight, UtensilsCrossed,
-  Check, ArrowRight, Trophy, MapPin, Navigation, Pencil,
+  Check, ArrowRight, Trophy, MapPin, Navigation, Pencil, Share2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import type { MonVietDish, Business } from "@/lib/types";
 import { businessSlug } from "@/lib/utils";
 import { getDishes, searchBusinesses, toggleDishChecked, getUserProfile, getDishFeatured, getBusinessPhotos } from "@/lib/services";
@@ -114,6 +117,21 @@ export default function DishDetailPage() {
     load();
   }, [slug, user]);
 
+  // Log listing view for dish
+  useEffect(() => {
+    if (dish) {
+      addDoc(collection(db, "eventLog"), {
+        event: "listing_view",
+        listingId: dish.id,
+        listingName: dish.name,
+        listingType: "food",
+        platform: "web",
+        userId: user?.id || "anonymous",
+        timestamp: serverTimestamp(),
+      }).catch(() => {});
+    }
+  }, [dish?.id]);
+
   // Build / update Google Map whenever businesses, sort, or user location changes
   useEffect(() => {
     if (!nearbyBusinesses.length || !mapRef.current) return;
@@ -170,7 +188,7 @@ export default function DishDetailPage() {
       if (!document.getElementById(scriptId)) {
         const script = document.createElement("script");
         script.id = scriptId;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&loading=async`;
         script.async = true;
         script.onload = initOrUpdateMap;
         document.head.appendChild(script);
@@ -283,13 +301,40 @@ export default function DishDetailPage() {
           {/* Hero — contained in column */}
           <div className="relative h-[260px] md:h-[340px] rounded-card overflow-hidden bg-ls-surface mb-xl">
             {dish.photoURL ? (
-              <Image src={dish.photoURL} alt={dish.name} fill className="object-cover" priority />
+              <OptImage src={dish.photoURL} alt={dish.name} fill sizes="100vw" className="object-cover" priority />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <UtensilsCrossed size={48} className="text-ls-secondary" />
               </div>
             )}
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/50 to-transparent" />
+
+            {/* Share button — top-right */}
+            <button
+              type="button"
+              onClick={async () => {
+                const shareData = {
+                  title: `${dish.name} — Little Saigon Go`,
+                  text: `${dish.name} — Little Saigon Go Food Guide`,
+                  url: typeof window !== "undefined" ? window.location.href : "",
+                };
+                try {
+                  if (navigator.share) {
+                    await navigator.share(shareData);
+                  } else {
+                    await navigator.clipboard.writeText(shareData.url);
+                    setMessage("Link copied to clipboard");
+                    setTimeout(() => setMessage(""), 3000);
+                  }
+                } catch {
+                  /* user cancelled */
+                }
+              }}
+              aria-label="Share this dish"
+              className="absolute top-md right-md w-[32px] h-[32px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/55 transition-colors"
+            >
+              <Share2 size={14} />
+            </button>
 
             {/* Prev / Next arrows */}
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-md">
@@ -384,7 +429,7 @@ export default function DishDetailPage() {
                     >
                       <div className="relative w-[150px] h-[150px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
                         {(biz.photos?.[0] || bizThumbnails[biz.id]) ? (
-                          <Image src={biz.photos?.[0] || bizThumbnails[biz.id]} alt={biz.name} width={300} height={300} className="w-full h-full object-cover" />
+                          <OptImage src={biz.photos?.[0] || bizThumbnails[biz.id]} alt={biz.name} width={300} height={300} sizes="150px" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <MapPin size={28} className="text-ls-secondary" />
@@ -475,7 +520,7 @@ export default function DishDetailPage() {
                     >
                       <div className="w-[75px] h-[75px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
                         {(biz.photos?.[0] || bizThumbnails[biz.id]) ? (
-                          <Image src={biz.photos?.[0] || bizThumbnails[biz.id]} alt={biz.name} width={150} height={150} className="w-full h-full object-cover" />
+                          <OptImage src={biz.photos?.[0] || bizThumbnails[biz.id]} alt={biz.name} width={150} height={150} sizes="75px" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <MapPin size={20} className="text-ls-secondary" />

@@ -6,9 +6,12 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getBusinessById, getBusinessPhotos, getReviewsForBusiness,
-  checkIn, submitReview, toggleFavorite,
+  checkIn, submitReview, toggleFavorite, toggleFollow, isFollowing,
+  getMenuSections,
 } from "@/lib/services";
-import type { Business, BusinessPhoto, Review, PhotoTag } from "@/lib/types";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type { Business, BusinessPhoto, Review, PhotoTag, MenuSection } from "@/lib/types";
 import { isCurrentlyOpen } from "@/lib/utils";
 import {
   MapPin, Phone, Globe, Clock, Star, ChevronLeft, Heart,
@@ -94,6 +97,7 @@ export default function BusinessDetailPage() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [photos, setPhotos] = useState<BusinessPhoto[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [followedUsers, setFollowedUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoTagFilter, setPhotoTagFilter] = useState<PhotoTag | null>(null);
@@ -108,6 +112,8 @@ export default function BusinessDetailPage() {
   const [checkInMsg, setCheckInMsg] = useState("");
 
   // Review
+  const [menuSections, setMenuSections] = useState<MenuSection[]>([]);
+
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
@@ -116,17 +122,30 @@ export default function BusinessDetailPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const businessId = slug.includes("--") ? slug.split("--").slice(1).join("--") : slug.slice(-8);
-      const biz = await getBusinessById(businessId);
+      const businessId = slug.includes("--") ? slug.split("--").slice(1).join("--") : slug;
+      let biz = await getBusinessById(businessId);
+      // Fallback: try last 8 chars as ID (legacy slug format)
+      if (!biz && !slug.includes("--") && slug.length > 8) {
+        biz = await getBusinessById(slug.slice(-8));
+      }
       if (!biz) { setLoading(false); return; }
       setBusiness(biz);
 
-      const [p, r] = await Promise.all([
+      const [p, r, ms] = await Promise.all([
         getBusinessPhotos(biz.id).catch((e) => { console.error("Photos fetch error:", e); return []; }),
         getReviewsForBusiness(biz.id).catch((e) => { console.error("Reviews fetch error:", e); return []; }),
+        getMenuSections(biz.id).catch(() => [] as MenuSection[]),
       ]);
       setPhotos(p);
       setReviews(r);
+      setMenuSections(ms);
+
+      // Check follow status for review authors
+      if (user && r.length > 0) {
+        const uniqueUserIds = Array.from(new Set(r.map((rv: Review) => rv.userId).filter((id: string) => id !== user.id)));
+        const checks = await Promise.all(uniqueUserIds.map((id: string) => isFollowing(user.id, id).then((f) => f ? id : null)));
+        setFollowedUsers(new Set(checks.filter(Boolean) as string[]));
+      }
 
       // Google reviews hidden
       // if (biz.placeId) {
@@ -144,6 +163,21 @@ export default function BusinessDetailPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Log listing view
+  useEffect(() => {
+    if (business) {
+      addDoc(collection(db, "eventLog"), {
+        event: "listing_view",
+        listingId: business.id,
+        listingName: business.name,
+        listingType: "business",
+        platform: "web",
+        userId: user?.id || "anonymous",
+        timestamp: serverTimestamp(),
+      }).catch(() => {});
+    }
+  }, [business?.id]);
+
   useEffect(() => {
     if (user && business) {
       setIsFavorite(user.favorites?.includes(business.id) || false);
@@ -156,8 +190,10 @@ export default function BusinessDetailPage() {
   }, [photoTagFilter]);
 
   // Build tagged photo list: subcollection photos have tags, business.photos are untagged
+  // Deduplicate: if a subcollection photo URL matches a business.photos URL, skip the business.photos entry
+  const subPhotoUrls = new Set(photos.map((p) => p.url));
   const taggedPhotos: { url: string; tag: PhotoTag | null }[] = [
-    ...(business?.photos || []).map((url) => ({ url, tag: null as PhotoTag | null })),
+    ...(business?.photos || []).filter((url) => !subPhotoUrls.has(url)).map((url) => ({ url, tag: null as PhotoTag | null })),
     ...photos.map((p) => ({ url: p.url, tag: p.tag })),
   ].filter((p) => Boolean(p.url));
 
@@ -281,6 +317,7 @@ export default function BusinessDetailPage() {
             alt=""
             className="max-h-[90vh] max-w-[95vw] object-contain"
             onClick={(e) => e.stopPropagation()}
+            fetchPriority="high"
           />
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
             {lightboxIndex + 1} / {allPhotoUrls.length}
@@ -307,8 +344,9 @@ export default function BusinessDetailPage() {
                   <img
                     src={url}
                     alt={`${business.name} photo ${i + 1}`}
-                    className="h-full object-cover"
-                    style={{ minWidth: allPhotoUrls.length === 1 ? "100vw" : "auto", maxWidth: "80vw" }}
+                    className="h-full w-auto"
+                    style={{ minWidth: allPhotoUrls.length === 1 ? "100%" : undefined }}
+                    loading={i === 0 ? "eager" : "lazy"}
                   />
                 </button>
               ))}
@@ -335,7 +373,11 @@ export default function BusinessDetailPage() {
             <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 40%, transparent 65%)" }} />
             <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">
               <div className="max-w-3xl mx-auto">
-                <h1 className="text-[56px] font-bold text-white leading-tight drop-shadow-lg">{business.name}</h1>
+                {(business as any).logoURL ? (
+                  <img src={(business as any).logoURL} alt={business.name} className="object-contain drop-shadow-lg" style={{ maxHeight: 150, maxWidth: 300 }} />
+                ) : (
+                  <h1 className="text-[56px] font-bold text-white leading-tight drop-shadow-lg">{business.name}</h1>
+                )}
                 <div className="flex items-center gap-[6px] mt-[6px] flex-wrap">
                   {/* Google rating hidden */}
                 </div>
@@ -425,7 +467,11 @@ export default function BusinessDetailPage() {
           <Camera size={40} className="text-ls-secondary" />
           <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/60 to-transparent">
             <div className="max-w-3xl mx-auto">
-              <h1 className="text-[26px] font-bold text-white">{business.name}</h1>
+              {(business as any).logoURL ? (
+                <img src={(business as any).logoURL} alt={business.name} className="object-contain" style={{ maxHeight: 80, maxWidth: 200 }} />
+              ) : (
+                <h1 className="text-[26px] font-bold text-white">{business.name}</h1>
+              )}
               <p className="text-[13px] text-white/70 capitalize mt-[2px]">{business.category?.replace(/_/g, " ")}</p>
             </div>
           </div>
@@ -475,60 +521,55 @@ export default function BusinessDetailPage() {
           <p className="text-[14px] text-ls-body mt-md leading-relaxed">{business.description}</p>
         )}
 
-        {/* Info Section */}
-        <div className="mt-xl space-y-md">
-          {/* Address */}
-          <div className="flex items-start gap-md">
-            <MapPin size={18} className="text-ls-secondary shrink-0 mt-[2px]" />
-            <a
-              href={directionsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[14px] text-ls-primary hover:underline"
-            >
-              {business.address}
-            </a>
-          </div>
-
-          {/* Phone */}
-          {business.phone && (
-            <div className="flex items-center gap-md">
-              <Phone size={18} className="text-ls-secondary shrink-0" />
-              <a href={`tel:${business.phone}`} className="text-[14px] text-ls-primary hover:underline">
-                {business.phone}
-              </a>
-            </div>
-          )}
-
-          {/* Website */}
-          {business.website && (
-            <div className="flex items-center gap-md">
-              <Globe size={18} className="text-ls-secondary shrink-0" />
+        {/* Info + Map — two column layout */}
+        <div className="mt-xl flex flex-col lg:flex-row gap-xl">
+          {/* Left: Business Info */}
+          <div className="flex-1 min-w-0 space-y-md">
+            {/* Address */}
+            <div className="flex items-start gap-md">
+              <MapPin size={18} className="text-ls-secondary shrink-0 mt-[2px]" />
               <a
-                href={business.website.startsWith("http") ? business.website : `https://${business.website}`}
+                href={directionsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[14px] text-ls-primary hover:underline truncate"
+                className="text-[14px] text-ls-primary hover:underline"
               >
-                {business.website.replace(/^https?:\/\//, "")}
+                {business.address}
               </a>
             </div>
-          )}
 
-          {/* Hours */}
-          {business.hours && business.hours.length > 0 && (
-            <div className="flex items-start gap-md">
-              <Clock size={18} className="text-ls-secondary shrink-0 mt-[2px]" />
-              <div>
-                <button
-                  onClick={() => setShowHours(!showHours)}
-                  className="text-[14px] text-ls-primary hover:underline flex items-center gap-xs"
+            {/* Phone */}
+            {business.phone && (
+              <div className="flex items-center gap-md">
+                <Phone size={18} className="text-ls-secondary shrink-0" />
+                <a href={`tel:${business.phone}`} className="text-[14px] text-ls-primary hover:underline">
+                  {business.phone}
+                </a>
+              </div>
+            )}
+
+            {/* Website */}
+            {business.website && (
+              <div className="flex items-center gap-md">
+                <Globe size={18} className="text-ls-secondary shrink-0" />
+                <a
+                  href={business.website.startsWith("http") ? business.website : `https://${business.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[14px] text-ls-primary hover:underline truncate"
                 >
-                  {todayHours || "See hours"}
-                  <span className="text-[11px] text-ls-secondary">{showHours ? "▲" : "▼"}</span>
-                </button>
-                {showHours && (
-                  <div className="mt-sm space-y-[2px]">
+                  {business.website.replace(/^https?:\/\//, "")}
+                </a>
+              </div>
+            )}
+
+            {/* Hours — expanded by default */}
+            {business.hours && business.hours.length > 0 && (
+              <div className="flex items-start gap-md">
+                <Clock size={18} className="text-ls-secondary shrink-0 mt-[2px]" />
+                <div>
+                  <p className="text-[14px] font-medium text-ls-primary mb-sm">Hours</p>
+                  <div className="space-y-[2px]">
                     {formatHours(business.hours).map((h, i) => (
                       <div key={i} className="flex gap-md text-[13px]">
                         <span className="text-ls-secondary w-[90px]">{h.day}</span>
@@ -536,26 +577,28 @@ export default function BusinessDetailPage() {
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Map */}
+          {business.latitude && business.longitude && (
+            <div className="lg:w-[40%] lg:shrink-0">
+              <div className="rounded-card overflow-hidden border border-ls-border">
+                <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
+                  <iframe
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${business.longitude - 0.008},${business.latitude - 0.005},${business.longitude + 0.008},${business.latitude + 0.005}&layer=mapnik&marker=${business.latitude},${business.longitude}`}
+                    width="100%"
+                    height="260"
+                    style={{ border: 0, pointerEvents: "none" }}
+                    loading="lazy"
+                  />
+                </a>
               </div>
             </div>
           )}
         </div>
-
-        {/* Map */}
-        {business.latitude && business.longitude && (
-          <div className="mt-xl rounded-card overflow-hidden border border-ls-border">
-            <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
-              <iframe
-                src={`https://www.openstreetmap.org/export/embed.html?bbox=${business.longitude - 0.008},${business.latitude - 0.005},${business.longitude + 0.008},${business.latitude + 0.005}&layer=mapnik&marker=${business.latitude},${business.longitude}`}
-                width="100%"
-                height="200"
-                style={{ border: 0, pointerEvents: "none" }}
-                loading="lazy"
-              />
-            </a>
-          </div>
-        )}
 
         {/* Write Review Modal */}
         {showReviewForm && (
@@ -615,7 +658,24 @@ export default function BusinessDetailPage() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-ls-primary truncate">{review.userName}</p>
+                      <div className="flex items-center gap-sm">
+                        <p className="text-[13px] font-semibold text-ls-primary truncate">{review.userName}</p>
+                        {user && review.userId !== user.id && (
+                          <button
+                            onClick={async () => {
+                              const result = await toggleFollow(user.id, review.userId);
+                              setFollowedUsers((prev) => {
+                                const next = new Set(prev);
+                                result ? next.add(review.userId) : next.delete(review.userId);
+                                return next;
+                              });
+                            }}
+                            className={`text-[11px] font-medium ${followedUsers.has(review.userId) ? "text-ls-secondary" : "text-ls-primary"}`}
+                          >
+                            {followedUsers.has(review.userId) ? "Following" : "Follow"}
+                          </button>
+                        )}
+                      </div>
                       <div className="flex items-center gap-xs">
                         <StarRating rating={review.rating} size={12} />
                         {review.createdAt && (
@@ -642,6 +702,92 @@ export default function BusinessDetailPage() {
           )}
         </div>
 
+        {/* Menu */}
+        <div className="mt-xl">
+          <div className="flex items-center justify-between mb-md">
+            <h2 className="text-section-header text-ls-primary flex items-center gap-sm">
+              <BookOpen size={18} /> Menu
+            </h2>
+            {menuSections.length > 0 && (
+              <Link
+                href={`/business/${slug}/menu`}
+                className="flex items-center gap-xs text-[13px] font-semibold text-ls-primary hover:underline"
+              >
+                Full Menu <span className="text-[11px]">→</span>
+              </Link>
+            )}
+          </div>
+          {(() => {
+            // Popular items: items with photos or tagged "popular"
+            const allItems = menuSections.flatMap((s) => s.items).filter((i) => i.available !== false);
+            const popular = allItems.filter((i) => (i.photoUrl && i.photoUrl.length > 0) || i.tags?.includes("popular"));
+            const highlights = popular.length > 0 ? popular.slice(0, 10) : allItems.slice(0, 6);
+
+            if (menuSections.length > 0 && highlights.length > 0) {
+              return (
+                <div>
+                  <p className="text-[13px] font-semibold text-ls-primary mb-sm">Popular Dishes</p>
+                  <div className="flex gap-md overflow-x-auto pb-sm scrollbar-hide">
+                    {highlights.map((item) => (
+                      <div key={item.id} className="shrink-0 w-[140px]">
+                        <div className="w-[140px] h-[140px] rounded-card overflow-hidden bg-ls-surface">
+                          {item.photoUrl ? (
+                            <img src={item.photoUrl} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <UtensilsCrossed size={28} className="text-ls-secondary/40" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[13px] font-semibold text-ls-primary mt-xs truncate">{item.nameVi || item.name}</p>
+                        {item.nameVi && <p className="text-[11px] text-ls-secondary truncate">{item.name}</p>}
+                        {item.price != null && (
+                          <p className="text-[12px] font-semibold text-ls-primary">${item.price.toFixed(2)}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <Link
+                    href={`/business/${slug}/menu`}
+                    className="block w-full text-center text-[14px] font-semibold text-white bg-ls-primary hover:opacity-90 rounded-btn py-[10px] mt-md transition-opacity"
+                  >
+                    See Full Menu
+                  </Link>
+                </div>
+              );
+            }
+
+            if (menuSections.length > 0) {
+              return (
+                <Link
+                  href={`/business/${slug}/menu`}
+                  className="block w-full text-center text-[14px] font-semibold text-white bg-ls-primary hover:opacity-90 rounded-btn py-[10px] transition-opacity"
+                >
+                  See Full Menu
+                </Link>
+              );
+            }
+
+            if (business.menuImageUrl) {
+              return (
+                <div className="ls-card overflow-hidden p-0">
+                  <img src={business.menuImageUrl} alt={`${business.name} menu`} className="w-full h-auto" loading="lazy" />
+                </div>
+              );
+            }
+
+            return (
+              <div className="ls-card text-center py-xl bg-ls-surface border-0">
+                <Camera size={32} className="text-ls-secondary mx-auto" />
+                <p className="text-[15px] font-semibold text-ls-primary mt-md">Help Us Build This Menu</p>
+                <p className="text-[13px] text-ls-secondary mt-xs max-w-sm mx-auto">
+                  Know this restaurant? Help us digitize their menu by submitting photos of their food and menu.
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+
         {/* Photo Grid */}
         {allPhotoUrls.length > 1 && (
           <div className="mt-xl">
@@ -653,7 +799,7 @@ export default function BusinessDetailPage() {
                   onClick={() => { setPhotoIndex(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   className="aspect-square rounded-card overflow-hidden"
                 >
-                  <img src={url} alt="" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
+                  <img src={url} alt="" className="w-full h-full object-cover hover:opacity-80 transition-opacity" loading="lazy" />
                 </button>
               ))}
             </div>

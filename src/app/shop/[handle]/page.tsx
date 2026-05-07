@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import OptImage from '@/components/ui/OptImage';
 import { getProductByHandle, createCart, addToCart } from '@/lib/shopify';
 import { useShoppingCart } from '@/contexts/ShoppingContext';
 
@@ -86,18 +86,15 @@ export default function ProductPage({ params }: { params: { handle: string } }) 
 
       let newCart;
       if (cart) {
-        // Add to existing cart
         const result = await addToCart(cart.id, [newLine]);
         newCart = (result as any)?.cartLinesAdd?.cart;
       } else {
-        // Create new cart
         const result = await createCart([newLine]);
         newCart = (result as any)?.cartCreate?.cart;
       }
 
       if (newCart) {
         setCart(newCart);
-        // Redirect to checkout
         window.location.href = newCart.checkoutUrl;
       }
     } catch (e) {
@@ -150,7 +147,7 @@ export default function ProductPage({ params }: { params: { handle: string } }) 
         <div className="space-y-md">
           {images.map((img, idx) => (
             <div key={img.node.id} className="relative w-full aspect-square">
-              <Image
+              <OptImage
                 src={img.node.url}
                 alt={img.node.altText || product.title}
                 fill
@@ -168,9 +165,7 @@ export default function ProductPage({ params }: { params: { handle: string } }) 
           </h1>
 
           <p className="text-section-header text-ls-secondary mb-xl">
-            $
-            {selectedVariant?.price?.amount ||
-              product.priceRange.minVariantPrice.amount}
+            ${Math.round(parseFloat(selectedVariant?.price?.amount || product.priceRange.minVariantPrice.amount))}
           </p>
 
           {product.description && (

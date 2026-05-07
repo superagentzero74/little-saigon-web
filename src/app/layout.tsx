@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     template: "%s | Little Saigon",
   },
   description:
-    "Discover the best Vietnamese restaurants, bakeries, cafes, salons, and businesses in Little Saigon, Southern California. Community-driven guide featuring 420+ listings, the Top 50 Món Việt guide, and curated Đỉnh Nhất picks.",
+    "Discover the best Vietnamese restaurants, bakeries, cafes, salons, and businesses in Little Saigon, Southern California. Community-driven guide featuring 800+ listings, the Top 50 Món Việt guide, and curated Đỉnh Nhất picks.",
   keywords: [
     "Little Saigon", "Vietnamese restaurants", "Vietnamese businesses", "Westminster", "Garden Grove",
     "Fountain Valley", "Santa Ana", "Orange County", "pho", "banh mi", "Vietnamese food",
@@ -18,16 +18,26 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: "Little Saigon — Vietnamese Business & Community Guide",
-    description: "420+ Vietnamese restaurants, bakeries, services, and businesses in Westminster, Garden Grove, Fountain Valley & Santa Ana.",
+    description: "800+ Vietnamese restaurants, businesses, and services in Westminster, Garden Grove, Fountain Valley & Santa Ana.",
     locale: "en_US",
     type: "website",
     siteName: "Little Saigon",
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#ffffff",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <meta name="apple-itunes-app" content="app-id=6759817166" />
+      </head>
       <body className="min-h-screen flex flex-col">
         <Providers>
           <Header />

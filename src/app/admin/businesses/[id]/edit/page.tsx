@@ -10,10 +10,11 @@ import {
 import {
   getBusinessById, updateBusiness, getBusinessPhotos,
   deleteBusinessPhoto, reorderBusinessPhotos, updateBusinessPhoto, getDishes,
-  uploadBusinessPhoto, getSubcategories,
+  uploadBusinessPhoto, getSubcategories, syncBusinessPhotos,
 } from "@/lib/services";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { BusinessCategory, LegacyBusinessCategory, BusinessPhoto, PhotoTag, MonVietDish, SubcategoryInfo, StructuredHourSlot } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 import VietInput from "@/components/ui/VietInput";
@@ -28,7 +29,7 @@ const PHOTO_TAGS: PhotoTag[] = ["outside", "inside", "food", "drinks", "menu", "
 const OTHER_TAG_GROUPS: { label: string; tags: string[] }[] = [
   { label: "Dietary", tags: ["Vegetarian", "Vegan", "Halal", "Gluten-Free"] },
   { label: "Meal", tags: ["Breakfast", "Lunch", "Dinner", "Brunch", "Late Night"] },
-  { label: "Service", tags: ["Dine-In", "Takeout", "Delivery", "Drive-Through"] },
+  { label: "Service", tags: ["Dine-In", "Takeout", "Delivery", "Drive-Through", "Food to Go"] },
 ];
 
 interface FormState {
@@ -39,6 +40,8 @@ interface FormState {
   address: string;
   phone: string;
   website: string;
+  instagramUrl: string;
+  facebookUrl: string;
   description: string;
   rating: string;
   totalRatings: string;
@@ -49,6 +52,9 @@ interface FormState {
   hours: string;
   structuredHours: StructuredHourSlot[];
   active: boolean;
+  isFeatured: boolean;
+  isNew: boolean;
+  seedScore: number;
   tags: string[];
 }
 
@@ -72,6 +78,11 @@ export default function EditBusinessPage() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logoURL, setLogoURL] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoMsg, setLogoMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
 
   const handleFileUpload = async (files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -109,6 +120,49 @@ export default function EditBusinessPage() {
     setDragging(false);
   };
 
+  const handleLogoUpload = async (file: File) => {
+    // Validate PNG or AVIF
+    const allowedTypes = ["image/png", "image/avif"];
+    if (!allowedTypes.includes(file.type)) {
+      setLogoMsg({ text: "Only PNG or AVIF files are accepted for logos.", err: true });
+      return;
+    }
+    // Validate file size (300KB max)
+    if (file.size > 300 * 1024) {
+      setLogoMsg({ text: `File is ${(file.size / 1024).toFixed(0)}KB — must be under 300KB.`, err: true });
+      return;
+    }
+    setUploadingLogo(true);
+    setLogoMsg(null);
+    try {
+      const ext = file.type === "image/avif" ? "avif" : "png";
+      const path = `businesses/${businessId}/logo.${ext}`;
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file, { contentType: file.type, cacheControl: "public, max-age=31536000" });
+      const url = await getDownloadURL(fileRef);
+      await updateBusiness(businessId, { logoURL: url } as any);
+      setLogoURL(url);
+      setLogoMsg({ text: "Logo saved!" });
+      setTimeout(() => setLogoMsg(null), 3000);
+    } catch (err: any) {
+      setLogoMsg({ text: err.message || "Upload failed", err: true });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!confirm("Remove logo?")) return;
+    try {
+      await updateBusiness(businessId, { logoURL: null } as any);
+      setLogoURL(null);
+      setLogoMsg({ text: "Logo removed." });
+      setTimeout(() => setLogoMsg(null), 3000);
+    } catch (err: any) {
+      setLogoMsg({ text: err.message || "Failed to remove", err: true });
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     const [biz, pics, allDishes, subs] = await Promise.all([
@@ -128,6 +182,8 @@ export default function EditBusinessPage() {
       address: biz.address || "",
       phone: biz.phone || "",
       website: biz.website || "",
+      instagramUrl: (biz as any).instagramUrl || "",
+      facebookUrl: (biz as any).facebookUrl || "",
       description: biz.description || "",
       rating: biz.rating != null ? String(biz.rating) : "",
       totalRatings: biz.totalRatings != null ? String(biz.totalRatings) : "",
@@ -142,17 +198,21 @@ export default function EditBusinessPage() {
           ? parseStringHoursToStructured(biz.hours)
           : [],
       active: biz.active ?? true,
+      isFeatured: (biz as any).isFeatured ?? false,
+      isNew: (biz as any).isNew ?? false,
+      seedScore: (biz as any).seedScore ?? 50,
       tags: biz.tags || [],
     };
     setForm(initial);
     initialFormRef.current = { ...initial, tags: [...initial.tags], categories: [...initial.categories], subcategories: [...initial.subcategories], structuredHours: [...initial.structuredHours] };
     setPhotos(pics);
+    setLogoURL(biz.logoURL || null);
     setLoading(false);
   }, [businessId, router]);
 
   useEffect(() => { load(); }, [load]);
 
-  const set = (key: keyof FormState, value: string | boolean | string[]) =>
+  const set = (key: keyof FormState, value: string | boolean | number | string[]) =>
     setForm((p) => p ? { ...p, [key]: value } : p);
 
   const isDirty = form && initialFormRef.current
@@ -216,6 +276,8 @@ export default function EditBusinessPage() {
         address: form.address.trim(),
         phone: form.phone.trim() || null,
         website: form.website.trim() || null,
+        instagramUrl: form.instagramUrl.trim() || null,
+        facebookUrl: form.facebookUrl.trim() || null,
         description: form.description.trim() || null,
         rating: form.rating ? parseFloat(form.rating) : 0,
         totalRatings: form.totalRatings ? parseInt(form.totalRatings) : 0,
@@ -226,6 +288,9 @@ export default function EditBusinessPage() {
         structuredHours: form.structuredHours,
         hours: structuredHoursToStringArray(form.structuredHours),
         active: form.active,
+        isFeatured: form.isFeatured,
+        isNew: form.isNew,
+        seedScore: form.seedScore,
         tags: form.tags,
       } as any);
       if (form) initialFormRef.current = { ...form, tags: [...form.tags], categories: [...form.categories], subcategories: [...form.subcategories], structuredHours: [...form.structuredHours] };
@@ -261,6 +326,7 @@ export default function EditBusinessPage() {
     if (!confirm("Delete this photo?")) return;
     await deleteBusinessPhoto(businessId, photo.id);
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    await syncBusinessPhotos(businessId);
   };
 
   const handleTagChange = async (photo: BusinessPhoto, tag: PhotoTag) => {
@@ -307,6 +373,7 @@ export default function EditBusinessPage() {
       createdAt: serverTimestamp(),
     });
     setPhotos((prev) => [...prev, { id: docRef.id, businessId, url: url.trim(), tag: "other", order: prev.length }]);
+    await syncBusinessPhotos(businessId);
   };
 
   const inputClass = "w-full bg-white border border-ls-border rounded-btn px-md py-[10px] text-[14px] text-ls-primary outline-none focus:border-ls-primary placeholder:text-ls-secondary";
@@ -331,152 +398,246 @@ export default function EditBusinessPage() {
         <span className="text-ls-primary truncate max-w-[200px]">{form.name}</span>
       </div>
 
-      <div className="flex items-center justify-between mb-2xl">
+      <div className="flex items-center justify-between mb-lg">
         <div>
           <h1 className="text-[24px] font-bold text-ls-primary">Edit Business</h1>
           <p className="text-[14px] text-ls-secondary mt-xs">{form.name}</p>
         </div>
-        <Link
-          href={`/business/${businessSlug({ id: businessId, name: form.name } as any)}`}
-          target="_blank"
-          className="flex items-center gap-sm text-[13px] font-medium border border-ls-border rounded-btn px-md py-[8px] text-ls-secondary hover:text-ls-primary hover:border-ls-primary transition-colors"
-        >
-          <Eye size={15} /> Preview
-        </Link>
+        <div className="flex items-center gap-sm">
+          <Link
+            href={`/admin/businesses/${businessId}/menu`}
+            className="flex items-center gap-sm text-[13px] font-medium border border-ls-border rounded-btn px-md py-[8px] text-ls-secondary hover:text-ls-primary hover:border-ls-primary transition-colors"
+          >
+            Menu
+          </Link>
+          <Link
+            href={`/business/${businessSlug({ id: businessId, name: form.name } as any)}`}
+            target="_blank"
+            className="flex items-center gap-sm text-[13px] font-medium border border-ls-border rounded-btn px-md py-[8px] text-ls-secondary hover:text-ls-primary hover:border-ls-primary transition-colors"
+          >
+            <Eye size={15} /> Preview
+          </Link>
+        </div>
       </div>
 
-      {/* ── Photos ── */}
-      <div className="bg-white rounded-card border border-ls-border p-lg mb-2xl">
-        <h2 className="text-[14px] font-semibold text-ls-primary mb-md flex items-center gap-sm">
-          <ImageIcon size={15} /> Photos ({photos.length})
-        </h2>
-
-        {/* Upload photos — drag & drop or file picker */}
-        <div onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} className={`border-2 border-dashed rounded-btn p-lg text-center transition-colors cursor-pointer mb-md ${dragging ? "border-ls-primary bg-ls-primary/5" : "border-ls-border hover:border-ls-primary/50"}`} onClick={() => fileInputRef.current?.click()}>
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) handleFileUpload(e.target.files); e.target.value = ""; }} />
-          {uploading ? (
-            <div className="flex flex-col items-center gap-sm">
-              <Loader2 size={24} className="animate-spin text-ls-primary" />
-              <p className="text-[13px] text-ls-secondary">{uploadProgress}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-sm">
-              <Upload size={24} className="text-ls-secondary" />
-              <p className="text-[13px] text-ls-primary font-medium">Drag & drop images here, or click to browse</p>
-              <p className="text-[11px] text-ls-secondary">Supports JPG, PNG, WebP — multiple files allowed</p>
-            </div>
-          )}
+      {/* ── Status Toggles ── */}
+      <div className="flex items-center gap-xl mb-2xl">
+        <label className="flex items-center gap-[10px] cursor-pointer" onClick={() => set("active", !form.active)}>
+          <span className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">Status</span>
+          <span className={`inline-flex items-center gap-[6px] text-[13px] font-medium px-[10px] py-[4px] rounded-full ${form.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+            <span className={`w-[8px] h-[8px] rounded-full ${form.active ? "bg-green-500" : "bg-gray-400"}`} />
+            {form.active ? "Active" : "Inactive"}
+          </span>
+        </label>
+        <label className="flex items-center gap-[10px] cursor-pointer" onClick={() => set("isFeatured", !form.isFeatured)}>
+          <span className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">Featured</span>
+          <span className={`inline-flex items-center gap-[6px] text-[13px] font-medium px-[10px] py-[4px] rounded-full ${form.isFeatured ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+            <span className={`w-[8px] h-[8px] rounded-full ${form.isFeatured ? "bg-amber-500" : "bg-gray-400"}`} />
+            {form.isFeatured ? "Featured" : "Normal"}
+          </span>
+        </label>
+        <label className="flex items-center gap-[10px] cursor-pointer" onClick={() => set("isNew", !form.isNew)}>
+          <span className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">Hot & New</span>
+          <span className={`inline-flex items-center gap-[6px] text-[13px] font-medium px-[10px] py-[4px] rounded-full ${form.isNew ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"}`}>
+            <span className={`w-[8px] h-[8px] rounded-full ${form.isNew ? "bg-orange-500" : "bg-gray-400"}`} />
+            {form.isNew ? "Hot & New" : "Off"}
+          </span>
+        </label>
+        <div className="flex items-center gap-[10px]">
+          <span className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">Rank</span>
+          <input type="number" min={0} max={100} value={form.seedScore} onChange={(e) => set("seedScore", Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))} className="w-[60px] bg-ls-surface rounded-btn px-sm py-[4px] text-[13px] text-ls-primary text-center outline-none focus:ring-2 focus:ring-ls-primary/20" />
         </div>
-
-        {/* Add photo by URL */}
-        <div className="mb-lg">
-          <p className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide mb-xs">Or add by URL</p>
-          <div className="flex gap-sm">
-            <input type="text" id="add-photo-url-top" placeholder="https://example.com/photo.jpg" className="flex-1 bg-white border border-ls-border rounded-btn px-md py-[8px] text-[13px] outline-none focus:border-ls-primary" />
-            <button onClick={() => { const el = document.getElementById("add-photo-url-top") as HTMLInputElement; handleAddPhotoUrl(el.value); el.value = ""; }} className="ls-btn-secondary flex items-center gap-xs text-[13px] py-sm px-md">
-              <Plus size={14} /> Add
-            </button>
-          </div>
-        </div>
-
-        {photos.length === 0 ? (
-          <p className="text-[13px] text-ls-secondary">No photos yet.</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-md">
-            {photos.map((photo, i) => (
-              <div
-                key={photo.id}
-                draggable
-                onDragStart={(e) => { setDragIdx(i); e.dataTransfer.effectAllowed = "move"; }}
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverIdx(i); }}
-                onDragLeave={() => setDragOverIdx(null)}
-                onDrop={(e) => { e.preventDefault(); setDragOverIdx(null); if (dragIdx !== null) { handlePhotoDrop(dragIdx, i); setDragIdx(null); } }}
-                onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
-                className={`rounded-btn overflow-hidden border-2 transition-all cursor-grab active:cursor-grabbing ${dragOverIdx === i && dragIdx !== i ? "border-ls-primary scale-[1.02] shadow-md" : dragIdx === i ? "border-ls-border opacity-40" : "border-ls-border"}`}
-              >
-                <div className="relative group">
-                  <img src={photo.url} alt={photo.description || `Photo ${i + 1}`} className="w-full h-[130px] object-cover pointer-events-none" />
-                  <div className="absolute top-[6px] left-[6px] bg-black/60 text-white text-[11px] font-bold w-[22px] h-[22px] rounded-full flex items-center justify-center">
-                    {i + 1}
-                  </div>
-                  <div className="absolute top-[6px] right-[6px] flex gap-[4px] opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => movePhoto(i, -1)} disabled={i === 0} className="bg-white/90 hover:bg-white text-ls-primary rounded p-[4px] disabled:opacity-30 shadow-sm" title="Move left"><ArrowLeft size={12} /></button>
-                    <button onClick={() => movePhoto(i, 1)} disabled={i === photos.length - 1} className="bg-white/90 hover:bg-white text-ls-primary rounded p-[4px] disabled:opacity-30 shadow-sm" title="Move right"><ArrowRight size={12} /></button>
-                  </div>
-                </div>
-                <div className="p-[8px] space-y-[6px] bg-white">
-                  <div className="flex items-center gap-[6px]">
-                    <select value={photo.tag} onChange={(e) => handleTagChange(photo, e.target.value as PhotoTag)} className="flex-1 text-[11px] bg-ls-surface border border-ls-border rounded px-[6px] py-[4px] outline-none focus:border-ls-primary">
-                      {PHOTO_TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <button onClick={() => handleDeletePhoto(photo)} className="text-red-400 hover:text-red-600 p-[4px]" title="Delete photo"><Trash2 size={13} /></button>
-                  </div>
-                  {photo.tag === "food" && (
-                    <div>
-                      {(photo.foodTags || []).length > 0 && (
-                        <div className="flex flex-wrap gap-[3px] mb-[4px]">
-                          {(photo.foodTags || []).map((ft) => (
-                            <span key={ft} className="inline-flex items-center gap-[2px] bg-ls-primary text-white text-[9px] font-medium px-[5px] py-[1px] rounded-full cursor-pointer hover:opacity-80" onClick={() => handlePhotoFoodTag(photo, ft)} title="Click to remove">
-                              {ft} <X size={8} />
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <select value="" onChange={(e) => { if (e.target.value) handlePhotoFoodTag(photo, e.target.value); }} className="w-full text-[10px] bg-ls-surface border border-ls-border rounded px-[6px] py-[3px] outline-none focus:border-ls-primary text-ls-secondary">
-                        <option value="">+ Add food tag...</option>
-                        {dishes.map((d) => (<option key={d.rank} value={d.name} disabled={(photo.foodTags || []).includes(d.name)}>{d.name} — {d.englishName}</option>))}
-                        {form && form.tags.filter((t) => !dishes.some((d) => d.name === t)).map((t) => (<option key={t} value={t} disabled={(photo.foodTags || []).includes(t)}>{t}</option>))}
-                      </select>
-                    </div>
-                  )}
-                  <input type="text" value={photo.description || ""} onChange={(e) => handleDescriptionChange(photo, e.target.value)} onBlur={() => handleDescriptionSave(photo)} placeholder="Add description..." className="w-full text-[11px] bg-ls-surface border border-ls-border rounded px-[6px] py-[4px] outline-none focus:border-ls-primary placeholder:text-ls-secondary/50" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* ── Business Details ── */}
-      <div className="bg-white rounded-card border border-ls-border p-lg space-y-lg mb-2xl">
-        <h2 className="text-[14px] font-semibold text-ls-primary">Business Details</h2>
-
+      {/* ── Section 1: Business Info ── */}
+      <div className="bg-white rounded-card border border-ls-border p-lg space-y-md mb-2xl">
+        <h2 className="text-[14px] font-semibold text-ls-primary">Business Info</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
-          {/* Name */}
           <div className="sm:col-span-2">
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Business Name *</label>
             <VietInput value={form.name} onChange={(v) => set("name", v)} className={inputClass} />
           </div>
-
-          {/* Categories (multi-select up to 3) */}
           <div className="sm:col-span-2">
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
-              Categories * <span className="font-normal text-ls-secondary/70">(select up to 3)</span>
-            </label>
+            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide"><MapPin size={11} className="inline mr-[3px]" />Address *</label>
+            <input type="text" value={form.address} onChange={(e) => set("address", e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide"><Phone size={11} className="inline mr-[3px]" />Phone</label>
+            <input type="text" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="(714) 555-0100" className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide"><Globe size={11} className="inline mr-[3px]" />Website</label>
+            <input type="text" value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="https://example.com" className={inputClass} />
+            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide mt-md">Instagram</label>
+            <input type="text" value={form.instagramUrl} onChange={(e) => set("instagramUrl", e.target.value)} placeholder="https://instagram.com/username or @username" className={inputClass} />
+            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide mt-md">Facebook</label>
+            <input type="text" value={form.facebookUrl} onChange={(e) => set("facebookUrl", e.target.value)} placeholder="https://facebook.com/pagename" className={inputClass} />
+          </div>
+          <div className="sm:col-span-2 grid grid-cols-3 gap-md">
+            <div>
+              <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide"><Star size={11} className="inline mr-[3px]" />Rating</label>
+              <input type="number" min="0" max="5" step="0.1" value={form.rating} onChange={(e) => set("rating", e.target.value)} placeholder="4.5" className={inputClass} readOnly />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Total Ratings</label>
+              <input type="number" min="0" value={form.totalRatings} onChange={(e) => set("totalRatings", e.target.value)} placeholder="128" className={inputClass} readOnly />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Price Level</label>
+              <select value={form.priceLevel} onChange={(e) => set("priceLevel", e.target.value)} className={inputClass}>
+                <option value="">Unknown</option>
+                <option value="1">$</option>
+                <option value="2">$$</option>
+                <option value="3">$$$</option>
+                <option value="4">$$$$</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-md pt-sm border-t border-ls-border">
+          <button onClick={handleSave} disabled={saving || !isDirty} className={`flex items-center gap-sm rounded-btn px-8 py-3.5 text-[15px] font-semibold transition-all ${isDirty ? "bg-ls-primary text-white hover:opacity-90" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+          {msg && <span className={`text-[13px] font-medium ${msg.err ? "text-red-500" : "text-green-600"}`}>{msg.err ? "⚠ " : "✓ "}{msg.text}</span>}
+        </div>
+      </div>
+
+      {/* ── Section 2: Images ── */}
+      <div className="bg-white rounded-card border border-ls-border p-lg mb-2xl">
+        <h2 className="text-[14px] font-semibold text-ls-primary mb-md flex items-center gap-sm">
+          <ImageIcon size={15} /> Images ({photos.length})
+        </h2>
+
+        {/* Photo thumbnails — one row, expandable */}
+        {photos.length > 0 && (() => {
+          const visiblePhotos = showAllPhotos ? photos : photos.slice(0, 5);
+          return (
+            <>
+              <div className="flex flex-wrap gap-[6px] mb-md">
+                {visiblePhotos.map((photo, i) => (
+                  <div
+                    key={photo.id}
+                    draggable
+                    onDragStart={(e) => { setDragIdx(i); e.dataTransfer.effectAllowed = "move"; }}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverIdx(i); }}
+                    onDragLeave={() => setDragOverIdx(null)}
+                    onDrop={(e) => { e.preventDefault(); setDragOverIdx(null); if (dragIdx !== null) { handlePhotoDrop(dragIdx, i); setDragIdx(null); } }}
+                    onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                    className={`relative group w-[150px] rounded-btn overflow-hidden border-2 cursor-grab active:cursor-grabbing shrink-0 ${dragOverIdx === i && dragIdx !== i ? "border-ls-primary scale-[1.02] shadow-md" : dragIdx === i ? "border-ls-border opacity-40" : "border-ls-border"}`}
+                  >
+                    <img src={photo.url} alt={photo.description || `Photo ${i + 1}`} className="w-full h-[125px] object-cover" loading="lazy" />
+                    <div className="absolute top-[4px] left-[4px] bg-black/60 text-white text-[10px] font-bold w-[20px] h-[20px] rounded-full flex items-center justify-center">{i + 1}</div>
+                    <div className="absolute top-[4px] right-[4px] flex gap-[3px] opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => movePhoto(i, -1)} disabled={i === 0} className="bg-white/90 rounded p-[3px] disabled:opacity-30" title="Move left"><ArrowLeft size={11} /></button>
+                      <button onClick={() => movePhoto(i, 1)} disabled={i === photos.length - 1} className="bg-white/90 rounded p-[3px] disabled:opacity-30" title="Move right"><ArrowRight size={11} /></button>
+                      <button onClick={() => handleDeletePhoto(photo)} className="bg-white/90 rounded p-[3px] text-red-500" title="Delete"><Trash2 size={11} /></button>
+                    </div>
+                    <div className="p-[6px] space-y-[4px]">
+                      <select
+                        value={photo.tag || "other"}
+                        onChange={(e) => handleTagChange(photo, e.target.value as PhotoTag)}
+                        className="w-full text-[11px] bg-ls-surface border border-ls-border/50 rounded px-[4px] py-[3px] outline-none"
+                      >
+                        <option value="food">food</option>
+                        <option value="interior">interior</option>
+                        <option value="exterior">exterior</option>
+                        <option value="menu">menu</option>
+                        <option value="other">other</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Add description…"
+                        defaultValue={photo.description || ""}
+                        onBlur={(e) => handleDescriptionChange(photo, e.target.value)}
+                        className="w-full text-[11px] bg-white border border-ls-border/50 rounded px-[4px] py-[3px] outline-none placeholder:text-ls-secondary/50"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {photos.length > 5 && (
+                <button onClick={() => setShowAllPhotos(!showAllPhotos)} className="text-[12px] font-semibold text-ls-primary hover:underline mb-md">
+                  {showAllPhotos ? "Show less" : `Show all ${photos.length} photos`}
+                </button>
+              )}
+            </>
+          );
+        })()}
+        {photos.length === 0 && <p className="text-[13px] text-ls-secondary mb-md">No photos yet.</p>}
+
+        {/* Upload */}
+        <div onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} className={`border-2 border-dashed rounded-btn p-md text-center transition-colors cursor-pointer mb-md ${dragging ? "border-ls-primary bg-ls-primary/5" : "border-ls-border hover:border-ls-primary/50"}`} onClick={() => fileInputRef.current?.click()}>
+          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) handleFileUpload(e.target.files); e.target.value = ""; }} />
+          {uploading ? (
+            <div className="flex items-center justify-center gap-sm">
+              <Loader2 size={16} className="animate-spin text-ls-primary" />
+              <p className="text-[13px] text-ls-secondary">{uploadProgress}</p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-sm">
+              <Upload size={16} className="text-ls-secondary" />
+              <p className="text-[13px] text-ls-secondary">Drop images here or click to upload</p>
+            </div>
+          )}
+        </div>
+
+        {/* Add by URL */}
+        <div className="flex gap-sm">
+          <input type="text" id="add-photo-url-top" placeholder="Or add by URL…" className="flex-1 bg-white border border-ls-border rounded-btn px-md py-[8px] text-[13px] outline-none focus:border-ls-primary" />
+          <button onClick={() => { const el = document.getElementById("add-photo-url-top") as HTMLInputElement; handleAddPhotoUrl(el.value); el.value = ""; }} className="ls-btn-secondary flex items-center gap-xs text-[13px] py-sm px-md">
+            <Plus size={14} /> Add
+          </button>
+        </div>
+      </div>
+
+      {/* ── Logo ── */}
+      <div className="bg-white rounded-card border border-ls-border p-lg mb-2xl">
+        <h2 className="text-[14px] font-semibold text-ls-primary mb-md flex items-center gap-sm">
+          <ImageIcon size={15} /> Business Logo
+        </h2>
+        <div className="flex items-start gap-lg">
+          <div className="w-[100px] h-[100px] rounded-card border border-ls-border overflow-hidden bg-[repeating-conic-gradient(#f0f0f0_0%_25%,#fff_0%_50%)] bg-[length:16px_16px] flex items-center justify-center shrink-0">
+            {logoURL ? (
+              <img src={logoURL} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <ImageIcon size={24} className="text-ls-border" />
+            )}
+          </div>
+          <div className="flex-1">
+            <p className="text-[12px] text-ls-secondary mb-sm">Transparent PNG or AVIF, recommended 512×512px or larger. Max 300KB.</p>
+            <div className="flex items-center gap-sm">
+              <label className="ls-btn-secondary flex items-center gap-sm text-[13px] cursor-pointer px-md py-[8px]">
+                {uploadingLogo ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                {uploadingLogo ? "Uploading..." : logoURL ? "Replace" : "Upload Logo"}
+                <input ref={logoInputRef} type="file" accept="image/png,image/avif" className="hidden" disabled={uploadingLogo} onChange={(e) => { const file = e.target.files?.[0]; if (file) handleLogoUpload(file); e.target.value = ""; }} />
+              </label>
+              {logoURL && <button onClick={handleRemoveLogo} className="text-[12px] text-red-500 hover:text-red-700 font-medium">Remove</button>}
+            </div>
+            {logoMsg && <p className={`text-[12px] font-semibold mt-sm ${logoMsg.err ? "text-red-500" : "text-green-600"}`}>{logoMsg.text}</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Categories, Status & Location ── */}
+      <div className="bg-white rounded-card border border-ls-border p-lg space-y-lg mb-2xl">
+        <h2 className="text-[14px] font-semibold text-ls-primary">Categories & Settings</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
+          {/* Categories */}
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Categories * <span className="font-normal text-ls-secondary/70">(up to 3)</span></label>
             <div className="flex flex-wrap gap-[6px]">
               {CATEGORY_OPTIONS.map(([k, { label, icon }]) => {
                 const selected = form.categories.includes(k);
                 return (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => toggleCategory(k)}
-                    className={`text-[12px] px-sm py-[4px] rounded-full border transition-colors ${
-                      selected
-                        ? "bg-ls-primary text-white border-ls-primary"
-                        : form.categories.length >= 3
-                          ? "border-ls-border bg-ls-surface text-ls-secondary/50 cursor-not-allowed"
-                          : "border-ls-border bg-ls-surface hover:border-ls-primary hover:text-ls-primary"
-                    }`}
-                    disabled={!selected && form.categories.length >= 3}
-                  >
+                  <button key={k} type="button" onClick={() => toggleCategory(k)} disabled={!selected && form.categories.length >= 3}
+                    className={`text-[12px] px-sm py-[4px] rounded-full border transition-colors ${selected ? "bg-ls-primary text-white border-ls-primary" : form.categories.length >= 3 ? "border-ls-border bg-ls-surface text-ls-secondary/50 cursor-not-allowed" : "border-ls-border bg-ls-surface hover:border-ls-primary hover:text-ls-primary"}`}>
                     {icon} {label}
                   </button>
                 );
               })}
             </div>
           </div>
-
           {/* Subcategories */}
           {form.categories.length > 0 && (
             <div className="sm:col-span-2">
@@ -484,24 +645,15 @@ export default function EditBusinessPage() {
               {form.categories.map((cat) => {
                 const subs = allSubcategories.filter((s) => s.parentSlug === cat);
                 if (subs.length === 0) return null;
-                const catLabel = CATEGORIES[cat]?.label || cat;
                 return (
                   <div key={cat} className="mb-sm">
-                    <p className="text-[10px] font-bold text-ls-secondary uppercase tracking-widest mb-[4px]">{catLabel}</p>
+                    <p className="text-[10px] font-bold text-ls-secondary uppercase tracking-widest mb-[4px]">{CATEGORIES[cat]?.label || cat}</p>
                     <div className="flex flex-wrap gap-[4px]">
                       {subs.map((sub) => {
                         const selected = form.subcategories.includes(sub.slug);
                         return (
-                          <button
-                            key={sub.slug}
-                            type="button"
-                            onClick={() => toggleSubcategory(sub.slug)}
-                            className={`text-[11px] px-[8px] py-[3px] rounded-full border transition-colors ${
-                              selected
-                                ? "bg-ls-primary text-white border-ls-primary"
-                                : "border-ls-border bg-ls-surface hover:border-ls-primary hover:text-ls-primary"
-                            }`}
-                          >
+                          <button key={sub.slug} type="button" onClick={() => toggleSubcategory(sub.slug)}
+                            className={`text-[11px] px-[8px] py-[3px] rounded-full border transition-colors ${selected ? "bg-ls-primary text-white border-ls-primary" : "border-ls-border bg-ls-surface hover:border-ls-primary hover:text-ls-primary"}`}>
                             {selected ? "" : "+ "}{sub.name}
                           </button>
                         );
@@ -512,72 +664,7 @@ export default function EditBusinessPage() {
               })}
             </div>
           )}
-
-          {/* Active */}
-          <div className="flex flex-col justify-end">
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Status</label>
-            <div className="flex items-center gap-sm py-[10px]">
-              <button
-                onClick={() => set("active", !form.active)}
-                className={`w-[44px] h-[24px] rounded-full transition-colors relative ${form.active ? "bg-green-500" : "bg-gray-300"}`}
-              >
-                <span className={`absolute top-[4px] w-[16px] h-[16px] bg-white rounded-full shadow transition-transform ${form.active ? "translate-x-[24px]" : "translate-x-[4px]"}`} />
-              </button>
-              <span className="text-[14px] text-ls-primary">{form.active ? "Active" : "Inactive"}</span>
-            </div>
-          </div>
-
-          {/* Address */}
-          <div className="sm:col-span-2">
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
-              <MapPin size={11} className="inline mr-[3px]" />Address *
-            </label>
-            <input type="text" value={form.address} onChange={(e) => set("address", e.target.value)} className={inputClass} />
-          </div>
-
-          {/* Phone */}
-          <div>
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
-              <Phone size={11} className="inline mr-[3px]" />Phone
-            </label>
-            <input type="text" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="(714) 555-0100" className={inputClass} />
-          </div>
-
-          {/* Website */}
-          <div>
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
-              <Globe size={11} className="inline mr-[3px]" />Website
-            </label>
-            <input type="text" value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="https://example.com" className={inputClass} />
-          </div>
-
-          {/* Rating */}
-          <div>
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">
-              <Star size={11} className="inline mr-[3px]" />Rating
-            </label>
-            <input type="number" min="0" max="5" step="0.1" value={form.rating} onChange={(e) => set("rating", e.target.value)} placeholder="4.5" className={inputClass} />
-          </div>
-
-          {/* Total Ratings */}
-          <div>
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Total Ratings</label>
-            <input type="number" min="0" value={form.totalRatings} onChange={(e) => set("totalRatings", e.target.value)} placeholder="128" className={inputClass} />
-          </div>
-
-          {/* Price Level */}
-          <div>
-            <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Price Level</label>
-            <select value={form.priceLevel} onChange={(e) => set("priceLevel", e.target.value)} className={inputClass}>
-              <option value="">Unknown</option>
-              <option value="1">$ — Inexpensive</option>
-              <option value="2">$$ — Moderate</option>
-              <option value="3">$$$ — Expensive</option>
-              <option value="4">$$$$ — Very Expensive</option>
-            </select>
-          </div>
-
-          {/* Lat / Lng */}
+          {/* Location */}
           <div>
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Latitude</label>
             <input type="number" step="any" value={form.latitude} onChange={(e) => set("latitude", e.target.value)} placeholder="33.7701" className={inputClass} />
@@ -586,40 +673,28 @@ export default function EditBusinessPage() {
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Longitude</label>
             <input type="number" step="any" value={form.longitude} onChange={(e) => set("longitude", e.target.value)} placeholder="-117.9680" className={inputClass} />
           </div>
-
-          {/* Place ID */}
           <div className="sm:col-span-2">
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Google Place ID</label>
             <input type="text" value={form.placeId} onChange={(e) => set("placeId", e.target.value)} placeholder="ChIJ…" className={inputClass} />
           </div>
-
           {/* Description */}
           <div className="sm:col-span-2">
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Description</label>
             <VietInput value={form.description} onChange={(v) => set("description", v)} multiline rows={3} className={inputClass + " resize-none"} />
           </div>
-
           {/* Hours */}
           <div className="sm:col-span-2">
             <label className="block text-[11px] font-semibold text-ls-secondary mb-xs uppercase tracking-wide">Hours</label>
-            <StructuredHoursEditor
-              value={form.structuredHours}
-              onChange={(slots) => setForm((p) => p ? { ...p, structuredHours: slots } : p)}
-            />
+            <StructuredHoursEditor value={form.structuredHours} onChange={(slots) => setForm((p) => p ? { ...p, structuredHours: slots } : p)} />
           </div>
         </div>
-
         <div className="flex items-center gap-md pt-sm border-t border-ls-border">
           <button onClick={handleSave} disabled={saving || !isDirty} className={`flex items-center gap-sm rounded-btn px-8 py-3.5 text-[15px] font-semibold transition-all ${isDirty ? "bg-ls-primary text-white hover:opacity-90" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
             {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
             {saving ? "Saving…" : "Save Changes"}
           </button>
           <button onClick={() => { if (isDirty && !confirm("You have unsaved changes. Discard and go back?")) return; router.push("/admin/businesses"); }} className="ls-btn-secondary text-[13px] py-sm px-lg">Cancel</button>
-          {msg && (
-            <span className={`text-[13px] font-medium ${msg.err ? "text-red-500" : "text-green-600"}`}>
-              {msg.err ? "⚠ " : "✓ "}{msg.text}
-            </span>
-          )}
+          {msg && <span className={`text-[13px] font-medium ${msg.err ? "text-red-500" : "text-green-600"}`}>{msg.err ? "⚠ " : "✓ "}{msg.text}</span>}
         </div>
       </div>
 

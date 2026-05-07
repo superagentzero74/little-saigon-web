@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Search, Loader2, CheckCircle, MapPin, Phone, Globe, Star, ChevronRight, X, ImageIcon } from "lucide-react";
 import { createBusiness, findDuplicateBusiness, getExistingPlaceIds } from "@/lib/services";
@@ -60,6 +60,7 @@ function inferCategory(types: string[]): BusinessCategory {
 
 export default function AddBusinessPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [googleQuery, setGoogleQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -70,6 +71,25 @@ export default function AddBusinessPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean; dupId?: string } | null>(null);
   const [existingPlaceIds, setExistingPlaceIds] = useState<Record<string, string>>({});
+
+  // Auto-prefill from ?q= and auto-trigger search; or jump straight to the
+  // selected place if ?placeId= is set (used by Inbox quick-add buttons).
+  useEffect(() => {
+    const q = searchParams?.get("q");
+    const placeId = searchParams?.get("placeId");
+    if (placeId) {
+      void handleSelectPlace({ place_id: placeId, name: "", formatted_address: "" });
+    } else if (q && !googleQuery) {
+      setGoogleQuery(q);
+      setTimeout(() => {
+        // Trigger the search after state settles. We read the query off state
+        // again in handleGoogleSearch, so this works after one tick.
+        const trigger = document.getElementById("auto-search-trigger");
+        trigger?.click();
+      }, 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleGoogleSearch = async () => {
     if (!googleQuery.trim()) return;
@@ -256,6 +276,7 @@ export default function AddBusinessPage() {
             className={inputClass + " flex-1"}
           />
           <button
+            id="auto-search-trigger"
             onClick={handleGoogleSearch}
             disabled={searching || !googleQuery.trim()}
             className="ls-btn flex items-center gap-sm shrink-0 disabled:opacity-50"

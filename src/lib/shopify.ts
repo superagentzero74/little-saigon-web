@@ -11,7 +11,7 @@ async function shopifyFetch<T>(
   variables?: Record<string, any>
 ): Promise<T> {
   const response = await fetch(
-    `https://${SHOPIFY_DOMAIN}/api/2024-01/graphql.json`,
+    `https://${SHOPIFY_DOMAIN}/api/2025-01/graphql.json`,
     {
       method: 'POST',
       headers: {

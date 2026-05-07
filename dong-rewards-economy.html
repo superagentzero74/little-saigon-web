@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đồng Rewards Economy — Little Saigon Official</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Be+Vietnam+Pro:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #B45309;
+    --gold-light: #FEF3C7;
+    --gold-mid: #D97706;
+    --amber-bg: #FFFBEB;
+    --surface: #F9F7F4;
+    --surface-2: #F2EFE9;
+    --border: rgba(0,0,0,0.08);
+    --border-mid: rgba(0,0,0,0.13);
+    --text: #1a1a18;
+    --text-2: #5a5850;
+    --text-3: #9a9890;
+    --red: #991b1b;
+    --green-bg: #D1FAE5;
+    --green-text: #065F46;
+    --blue-bg: #E0E7FF;
+    --blue-text: #3730A3;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text);
+    background: #fff;
+  }
+
+  /* ── Layout ── */
+  .page { max-width: 860px; margin: 0 auto; padding: 0 2rem 6rem; }
+
+  /* ── Header ── */
+  header {
+    padding: 5rem 0 3.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3.5rem;
+  }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 5vw, 3.6rem);
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 1rem;
+  }
+  h1 em { font-style: italic; color: var(--gold); }
+  .hero-sub {
+    font-size: 16px;
+    color: var(--text-2);
+    max-width: 560px;
+    line-height: 1.7;
+  }
+  .meta-row {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2rem;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .meta-row span { display: flex; align-items: center; gap: 5px; }
+
+  /* ── Section ── */
+  section { margin-bottom: 4rem; }
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+  }
+  p { color: var(--text-2); margin-bottom: 1rem; }
+
+  /* ── Metric grid ── */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 2rem;
+  }
+  @media (max-width: 600px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } }
+  .metric {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+  }
+  .metric-label { font-size: 11px; color: var(--text-3); margin-bottom: 5px; }
+  .metric-value { font-size: 19px; font-weight: 500; color: var(--text); }
+  .metric-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin-bottom: 1rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-mid);
+    background: var(--surface);
+  }
+  tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface); }
+  .td-note { font-size: 12px; color: var(--text-3); }
+  .dong-val { font-weight: 500; color: var(--gold); }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 500;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .b-gold { background: var(--gold-light); color: #92400E; }
+  .b-high { background: var(--green-bg); color: var(--green-text); }
+  .b-mid  { background: var(--blue-bg);  color: var(--blue-text); }
+  .b-low  { background: var(--surface-2); color: var(--text-2); }
+
+  /* ── Note box ── */
+  .note-box {
+    background: var(--amber-bg);
+    border-left: 3px solid var(--gold-mid);
+    border-radius: 0 8px 8px 0;
+    padding: 0.9rem 1.1rem;
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.6;
+    margin-top: 1rem;
+  }
+
+  /* ── Tier list ── */
+  .tier-list { display: flex; flex-direction: column; gap: 6px; }
+  .tier-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-radius: 8px;
+  }
+  .tier-name { font-size: 13.5px; font-weight: 500; min-width: 120px; }
+  .tier-range { font-size: 12px; color: var(--text-3); flex: 1; }
+  .tier-bar-wrap { width: 100px; height: 4px; background: var(--border-mid); border-radius: 2px; overflow: hidden; }
+  .tier-bar { height: 4px; background: var(--gold-mid); border-radius: 2px; }
+  .tier-bonus { font-size: 13px; font-weight: 500; color: var(--gold); min-width: 60px; text-align: right; }
+  @media (max-width: 540px) { .tier-bar-wrap { display: none; } }
+
+  /* ── Phase grid ── */
+  .phase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 0.5rem;
+  }
+  @media (max-width: 580px) { .phase-grid { grid-template-columns: 1fr; } }
+  .phase-card {
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    padding: 1.25rem;
+    background: #fff;
+  }
+  .phase-tag {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 6px;
+  }
+  .phase-name { font-size: 14px; font-weight: 500; margin-bottom: 8px; color: var(--text); }
+  .phase-desc { font-size: 12.5px; color: var(--text-2); line-height: 1.55; }
+
+  /* ── Intro rewards grid ── */
+  .earn-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 2rem;
+  }
+  @media (max-width: 580px) { .earn-grid { grid-template-columns: repeat(2, 1fr); } }
+  .earn-card {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+  }
+  .earn-icon { font-size: 20px; margin-bottom: 6px; }
+  .earn-label { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .earn-amount { font-size: 12px; color: var(--gold); font-weight: 500; margin-bottom: 4px; }
+  .earn-desc { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+
+  /* ── Redeem pills ── */
+  .redeem-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 2rem; }
+  .redeem-pill {
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 13px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .redeem-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold-mid); flex-shrink: 0; }
+
+  /* ── Simulator ── */
+  .sim-wrap {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 1.5rem 1.75rem;
+  }
+  .sim-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 0.85rem;
+  }
+  .sim-label { font-size: 13px; color: var(--text-2); min-width: 150px; }
+  .sim-row input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border-mid);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  .sim-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+  }
+  .sim-out { font-size: 13px; font-weight: 500; color: var(--text); min-width: 30px; text-align: right; }
+  .sim-total-row {
+    border-top: 1px solid var(--border-mid);
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .sim-heading { font-size: 13px; color: var(--text-2); }
+  .sim-total { font-size: 26px; font-weight: 500; color: var(--gold); }
+  .sim-usd { font-size: 14px; color: var(--text-3); }
+  .sim-note { font-size: 12.5px; color: var(--text-3); margin-top: 8px; line-height: 1.55; }
+
+  /* ── Divider ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 2rem;
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.6;
+  }
+  .footer-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    color: var(--gold);
+    font-style: italic;
+    margin-bottom: 0.5rem;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="eyebrow">Little Saigon Official · Rewards Program</div>
+    <h1>The <em>Đồng</em> Economy</h1>
+    <p class="hero-sub">
+      A balanced community rewards system for the Little Saigon app — designed to grow
+      engagement, reward real participation, and build long-term community value.
+    </p>
+    <div class="meta-row">
+      <span>Version 1.0 — Launch Phase</span>
+      <span>Exchange: 100 ₫ = $1</span>
+      <span>littlesaigon.com</span>
+    </div>
+  </header>
+
+  <!-- ── Intro Page Copy ── -->
+  <section>
+    <div class="section-label">01 — Rewards Intro Page Copy</div>
+    <h2>Earn Đồng for every Little Saigon moment.</h2>
+    <p>Leave a review. Check in to your favorite spots. Share a photo.
+    Every action earns you Đồng — redeemable for merch and free food
+    at restaurants across the community.</p>
+
+    <div class="earn-grid">
+      <div class="earn-card">
+        <div class="earn-icon">✍</div>
+        <div class="earn-label">Write a review</div>
+        <div class="earn-amount">+150 ₫</div>
+        <div class="earn-desc">Share your honest experience at any listed business.</div>
+      </div>
+      <div class="earn-card">
+        <div class="earn-icon">📍</div>
+        <div class="earn-label">Check in</div>
+        <div class="earn-amount">+50 ₫</div>
+        <div class="earn-desc">Let the community know you're there. Check in daily.</div>
+      </div>
+      <div class="earn-card">
+        <div class="earn-icon">📷</div>
+        <div class="earn-label">Upload a photo</div>
+        <div class="earn-amount">+75 ₫</div>
+        <div class="earn-desc">Add photos of dishes, storefronts, and events.</div>
+      </div>
+      <div class="earn-card">
+        <div class="earn-icon">★</div>
+        <div class="earn-label">Attend an event</div>
+        <div class="earn-amount">+500 ₫</div>
+        <div class="earn-desc">Highest reward. Verified QR check-in at community events.</div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-top:2rem">Redeem for</div>
+    <div class="redeem-row">
+      <div class="redeem-pill"><span class="redeem-dot"></span>Free food at participating restaurants</div>
+      <div class="redeem-pill"><span class="redeem-dot"></span>Little Saigon merch</div>
+      <div class="redeem-pill"><span class="redeem-dot"></span>Exclusive member discounts</div>
+      <div class="redeem-pill"><span class="redeem-dot"></span>Limited event perks</div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── Economy Overview ── -->
+  <section>
+    <div class="section-label">02 — Economy Overview</div>
+    <h2>Core parameters — launch phase</h2>
+    <p>These values govern Phase 1. They are intentionally generous to drive early adoption.
+    Supply controls tighten in Phase 2 as the user base grows.</p>
+
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="metric-label">Exchange rate</div>
+        <div class="metric-value">100 ₫ = $1</div>
+        <div class="metric-sub">Fixed peg, Phase 1</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Daily earn cap</div>
+        <div class="metric-value">500 ₫ / day</div>
+        <div class="metric-sub">Per user</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Point expiry</div>
+        <div class="metric-value">12 months</div>
+        <div class="metric-sub">After last activity</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Supply model</div>
+        <div class="metric-value">Demand-minted</div>
+        <div class="metric-sub">No fixed cap, Phase 1</div>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── Earning Schedule ── -->
+  <section>
+    <div class="section-label">03 — Full Earning Schedule</div>
+    <h2>All earn activities and point values</h2>
+    <p>Events generate the highest Đồng because they create the most real-world community value.
+    Content actions (reviews, photos) are the core content engine. App usage habits compound over time.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:38%">Activity</th>
+            <th style="width:27%">Notes / limits</th>
+            <th style="width:18%">Đồng earned</th>
+            <th style="width:17%">Est. $ value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge b-gold">★ Top</span>Attend a community event</td>
+            <td class="td-note">Verified check-in via QR. Once per event.</td>
+            <td><span class="dong-val">500 ₫</span></td>
+            <td>$5.00</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-gold">★ Top</span>Host / organize an event</td>
+            <td class="td-note">Admin verified. Once per event.</td>
+            <td><span class="dong-val">1,000 ₫</span></td>
+            <td>$10.00</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-high">High</span>Write a detailed review</td>
+            <td class="td-note">≥ 75 words. 3× per day max.</td>
+            <td><span class="dong-val">150 ₫</span></td>
+            <td>$1.50</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-high">High</span>Upload a photo</td>
+            <td class="td-note">To any business listing. 5× per day max.</td>
+            <td><span class="dong-val">75 ₫</span></td>
+            <td>$0.75</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-high">High</span>Refer a new user</td>
+            <td class="td-note">Paid when referral completes profile.</td>
+            <td><span class="dong-val">200 ₫</span></td>
+            <td>$2.00</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-mid">Mid</span>Check in to a business</td>
+            <td class="td-note">Once per business per day.</td>
+            <td><span class="dong-val">50 ₫</span></td>
+            <td>$0.50</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-mid">Mid</span>Complete your profile</td>
+            <td class="td-note">One-time. Photo + bio + neighborhood.</td>
+            <td><span class="dong-val">250 ₫</span></td>
+            <td>$2.50</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-mid">Mid</span>Daily app open (streak)</td>
+            <td class="td-note">Streak bonuses at 7d / 30d / 90d.</td>
+            <td><span class="dong-val">10 ₫</span></td>
+            <td>$0.10</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-mid">Mid</span>Bookmark a business</td>
+            <td class="td-note">First time per business only.</td>
+            <td><span class="dong-val">10 ₫</span></td>
+            <td>$0.10</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-low">Bonus</span>7-day streak bonus</td>
+            <td class="td-note">Once per streak cycle.</td>
+            <td><span class="dong-val">75 ₫</span></td>
+            <td>$0.75</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-low">Bonus</span>30-day streak bonus</td>
+            <td class="td-note">Once per streak cycle.</td>
+            <td><span class="dong-val">200 ₫</span></td>
+            <td>$2.00</td>
+          </tr>
+          <tr>
+            <td><span class="badge b-low">Bonus</span>First visit to new city zone</td>
+            <td class="td-note">Westminster / Garden Grove / Santa Ana / Fountain Valley.</td>
+            <td><span class="dong-val">100 ₫</span></td>
+            <td>$1.00</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note-box">
+      The 500 ₫/day cap is the primary inflation control. No matter how active a user is,
+      they can't earn more than $5/day. As the user base scales, tighten this cap rather than
+      individual earn rates — users notice rate cuts more than cap reductions.
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── Redemption ── -->
+  <section>
+    <div class="section-label">04 — Redemption Catalog</div>
+    <h2>What Đồng buys</h2>
+    <p>Redemption costs are set 15–20% below face value to keep Đồng feeling generous.
+    Restaurants receive platform reimbursement at cost. Raise costs ~20% in Phase 2.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:42%">Reward</th>
+            <th style="width:22%">Est. retail value</th>
+            <th style="width:22%">Đồng cost</th>
+            <th style="width:14%">Discount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Free appetizer / small dish</td>
+            <td>~$8</td>
+            <td><span class="dong-val">700 ₫</span></td>
+            <td>−13%</td>
+          </tr>
+          <tr>
+            <td>Free entrée at participating restaurant</td>
+            <td>~$15</td>
+            <td><span class="dong-val">1,200 ₫</span></td>
+            <td>−20%</td>
+          </tr>
+          <tr>
+            <td>LS sticker pack / button set</td>
+            <td>~$5</td>
+            <td><span class="dong-val">400 ₫</span></td>
+            <td>−20%</td>
+          </tr>
+          <tr>
+            <td>LS tote bag</td>
+            <td>~$18</td>
+            <td><span class="dong-val">1,500 ₫</span></td>
+            <td>−17%</td>
+          </tr>
+          <tr>
+            <td>LS t-shirt / apparel</td>
+            <td>~$30</td>
+            <td><span class="dong-val">2,500 ₫</span></td>
+            <td>−17%</td>
+          </tr>
+          <tr>
+            <td>Event ticket (community event)</td>
+            <td>~$20</td>
+            <td><span class="dong-val">1,800 ₫</span></td>
+            <td>−10%</td>
+          </tr>
+          <tr>
+            <td>Exclusive digital badge / title upgrade</td>
+            <td>Prestige</td>
+            <td><span class="dong-val">500 ₫</span></td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── Tier Multipliers ── -->
+  <section>
+    <div class="section-label">05 — Loyalty Tier System</div>
+    <h2>Eight levels. Higher tiers earn faster.</h2>
+    <p>Tier is based on lifetime Đồng earned — not current balance. This means spending doesn't
+    demote users, encouraging both earning and redemption.</p>
+
+    <div class="tier-list">
+      <div class="tier-item">
+        <div class="tier-name">Khách</div>
+        <div class="tier-range">0 – 499 ₫ lifetime</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:4%"></div></div>
+        <div class="tier-bonus">1.0× base</div>
+      </div>
+      <div class="tier-item">
+        <div class="tier-name">Bạn</div>
+        <div class="tier-range">500 – 1,999 ₫</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:12%"></div></div>
+        <div class="tier-bonus">1.1×</div>
+      </div>
+      <div class="tier-item">
+        <div class="tier-name">Thân</div>
+        <div class="tier-range">2,000 – 4,999 ₫</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:22%"></div></div>
+        <div class="tier-bonus">1.15×</div>
+      </div>
+      <div class="tier-item">
+        <div class="tier-name">Làng</div>
+        <div class="tier-range">5,000 – 9,999 ₫</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:35%"></div></div>
+        <div class="tier-bonus">1.2×</div>
+      </div>
+      <div class="tier-item">
+        <div class="tier-name">Hội</div>
+        <div class="tier-range">10,000 – 19,999 ₫</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:50%"></div></div>
+        <div class="tier-bonus">1.25×</div>
+      </div>
+      <div class="tier-item">
+        <div class="tier-name">Đồng Hương</div>
+        <div class="tier-range">20,000 – 49,999 ₫</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:65%"></div></div>
+        <div class="tier-bonus">1.3×</div>
+      </div>
+      <div class="tier-item">
+        <div class="tier-name">Nghĩa Hiệp</div>
+        <div class="tier-range">50,000 – 99,999 ₫</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:82%"></div></div>
+        <div class="tier-bonus">1.4×</div>
+      </div>
+      <div class="tier-item">
+        <div class="tier-name">Rồng Vàng</div>
+        <div class="tier-range">100,000+ ₫ lifetime</div>
+        <div class="tier-bar-wrap"><div class="tier-bar" style="width:100%"></div></div>
+        <div class="tier-bonus">1.5×</div>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── Phase Roadmap ── -->
+  <section>
+    <div class="section-label">06 — Phase Roadmap & Supply Control</div>
+    <h2>From launch to scale</h2>
+    <p>The Đồng economy is designed in two phases. Supply is controlled progressively
+    as the user base matures.</p>
+
+    <div class="phase-grid">
+      <div class="phase-card">
+        <div class="phase-tag">Phase 1 · Now</div>
+        <div class="phase-name">Generous — Launch</div>
+        <div class="phase-desc">High earn rates. Low redemption costs. Goal: acquire users and build daily habit. Daily cap 500 ₫. Demand-minted supply.</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-tag">Phase 2 · Growth</div>
+        <div class="phase-name">Balanced — Scale</div>
+        <div class="phase-desc">Earn rates drop ~20%. Redemption costs rise ~20%. Daily cap tightens to 350 ₫. Tier multipliers drive retention. Supply slows.</div>
+      </div>
+    </div>
+
+    <div class="note-box" style="margin-top:1.25rem">
+      Key principle: reduce the daily earn cap, not individual activity rates. Users psychologically
+      anchor to per-action values. A lower cap feels like a platform-level decision; a lower per-review
+      rate feels like a pay cut. Protect the per-action rates as long as possible.
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── Simulator ── -->
+  <section>
+    <div class="section-label">07 — User Earnings Simulator</div>
+    <h2>Estimate monthly Đồng by activity level</h2>
+    <p>Adjust the sliders to model different user types — from casual visitors to power users and event hosts.</p>
+
+    <div class="sim-wrap">
+      <div class="sim-row">
+        <span class="sim-label">Events attended</span>
+        <input type="range" min="0" max="8" value="2" step="1" id="s-events">
+        <span class="sim-out" id="o-events">2</span>
+      </div>
+      <div class="sim-row">
+        <span class="sim-label">Reviews written</span>
+        <input type="range" min="0" max="30" value="6" step="1" id="s-reviews">
+        <span class="sim-out" id="o-reviews">6</span>
+      </div>
+      <div class="sim-row">
+        <span class="sim-label">Photos uploaded</span>
+        <input type="range" min="0" max="60" value="10" step="1" id="s-photos">
+        <span class="sim-out" id="o-photos">10</span>
+      </div>
+      <div class="sim-row">
+        <span class="sim-label">Check-ins</span>
+        <input type="range" min="0" max="60" value="12" step="1" id="s-checkins">
+        <span class="sim-out" id="o-checkins">12</span>
+      </div>
+      <div class="sim-row">
+        <span class="sim-label">Days active (streak)</span>
+        <input type="range" min="0" max="30" value="20" step="1" id="s-streak">
+        <span class="sim-out" id="o-streak">20</span>
+      </div>
+      <div class="sim-row">
+        <span class="sim-label">Referrals</span>
+        <input type="range" min="0" max="10" value="1" step="1" id="s-refs">
+        <span class="sim-out" id="o-refs">1</span>
+      </div>
+      <div class="sim-total-row">
+        <span class="sim-heading">Est. monthly total</span>
+        <span class="sim-total" id="sim-total">2,550 ₫</span>
+        <span class="sim-usd" id="sim-usd">≈ $25.50</span>
+      </div>
+      <div class="sim-note" id="sim-note">A moderately active user. Enough to redeem 1–2 free meals per month.</div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="footer-brand">Little Saigon Official</div>
+    <p>Đồng is a closed-loop loyalty currency operated by Little Saigon Official.
+    Points have no cash value and are not transferable. Participating businesses and
+    redemption options are subject to change.</p>
+    <p style="margin-top:0.5rem">© Little Saigon Official · littlesaigon.com</p>
+  </footer>
+
+</div>
+
+<script>
+  function calc() {
+    var events   = +document.getElementById('s-events').value;
+    var reviews  = +document.getElementById('s-reviews').value;
+    var photos   = +document.getElementById('s-photos').value;
+    var checkins = +document.getElementById('s-checkins').value;
+    var streak   = +document.getElementById('s-streak').value;
+    var refs     = +document.getElementById('s-refs').value;
+
+    document.getElementById('o-events').textContent   = events;
+    document.getElementById('o-reviews').textContent  = reviews;
+    document.getElementById('o-photos').textContent   = photos;
+    document.getElementById('o-checkins').textContent = checkins;
+    document.getElementById('o-streak').textContent   = streak;
+    document.getElementById('o-refs').textContent     = refs;
+
+    var raw = (events * 500) + (reviews * 150) + (photos * 75) + (checkins * 50) + (streak * 10) + (refs * 200);
+    var total = Math.min(Math.round(raw), 500 * 30);
+    var usd = (total / 100).toFixed(2);
+
+    document.getElementById('sim-total').textContent = total.toLocaleString() + ' ₫';
+    document.getElementById('sim-usd').textContent   = '≈ $' + usd;
+
+    var note = '';
+    if (total < 500)       note = 'Light user — mostly app opens and occasional check-ins. Building toward a sticker pack.';
+    else if (total < 1500) note = 'Casual engagement. A couple reviews and check-ins per week. Getting close to a free appetizer.';
+    else if (total < 3000) note = 'Solid community member. Posting and attending events regularly. Redeemable for a free meal each month.';
+    else                   note = 'Power user or event host. Hitting the daily cap often. Could earn a t-shirt or multiple meals per month.';
+
+    document.getElementById('sim-note').textContent = note;
+  }
+
+  ['s-events','s-reviews','s-photos','s-checkins','s-streak','s-refs'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', calc);
+  });
+
+  calc();
+</script>
+</body>
+</html>

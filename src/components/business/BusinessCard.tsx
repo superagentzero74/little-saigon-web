@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
+import OptImage from "@/components/ui/OptImage";
 import type { Business } from "@/lib/types";
-import { getCategoryInfo } from "@/lib/types";
+import { getAllCategoryInfos } from "@/lib/types";
 import { businessSlug, formatPriceLevel, isCurrentlyOpen } from "@/lib/utils";
 import StarRating from "@/components/ui/StarRating";
 import OpenStatus from "@/components/ui/OpenStatus";
@@ -13,7 +13,7 @@ interface BusinessCardProps {
 
 export default function BusinessCard({ business }: BusinessCardProps) {
   const slug = businessSlug(business);
-  const catInfo = getCategoryInfo(business);
+  const catInfos = getAllCategoryInfos(business);
   const openStatus = isCurrentlyOpen(business.hours, business.structuredHours);
   const photoUrl = business.photos?.[0];
 
@@ -21,19 +21,19 @@ export default function BusinessCard({ business }: BusinessCardProps) {
     <Link href={`/business/${slug}`} className="ls-card block group">
       <div className="flex gap-lg">
         {/* Thumbnail */}
-        <div className="w-[88px] h-[88px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
-          {photoUrl ? (
-            <Image
+        <div className="relative w-[88px] h-[88px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
+          <div className="absolute inset-0 flex items-center justify-center text-2xl">
+            {catInfos[0]?.icon || "🍜"}
+          </div>
+          {photoUrl && (
+            <OptImage
               src={photoUrl}
               alt={business.name}
               width={176}
               height={176}
-              className="w-full h-full object-cover"
+              sizes="88px"
+              className="relative w-full h-full object-cover"
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-2xl">
-              {catInfo?.icon || "🍜"}
-            </div>
           )}
         </div>
 
@@ -50,8 +50,10 @@ export default function BusinessCard({ business }: BusinessCardProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-sm mt-xs">
-            <span className="ls-tag text-[11px]">{catInfo?.label || business.category}</span>
+          <div className="flex items-center gap-sm mt-xs flex-wrap">
+            {catInfos.map((info, i) => (
+              <span key={i} className="ls-tag text-[11px]">{info.label}</span>
+            ))}
             <OpenStatus isOpen={openStatus} />
           </div>
 

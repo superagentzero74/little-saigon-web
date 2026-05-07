@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import OptImage from "@/components/ui/OptImage";
 import type { MonVietDish } from "@/lib/types";
 import { dishSlug } from "@/lib/utils";
 import { UtensilsCrossed } from "lucide-react";
@@ -19,19 +19,19 @@ export default function DishCard({ dish, variant = "full" }: DishCardProps) {
         href={`/guide/${slug}`}
         className="flex-shrink-0 w-[180px] group text-center"
       >
-        <div className="w-[160px] h-[160px] mx-auto rounded-card overflow-hidden bg-ls-surface border border-ls-border">
-          {dish.photoURL ? (
-            <Image
+        <div className="relative w-[160px] h-[160px] mx-auto rounded-card overflow-hidden bg-ls-surface border border-ls-border">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <UtensilsCrossed size={36} className="text-ls-secondary" />
+          </div>
+          {dish.photoURL && (
+            <OptImage
               src={dish.photoURL}
               alt={dish.name}
               width={320}
               height={320}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+              sizes="160px"
+              className="relative w-full h-full object-cover group-hover:scale-105 transition-transform"
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <UtensilsCrossed size={36} className="text-ls-secondary" />
-            </div>
           )}
         </div>
         <p className="text-[13px] font-medium text-ls-primary mt-xs truncate px-xs">
@@ -51,19 +51,19 @@ export default function DishCard({ dish, variant = "full" }: DishCardProps) {
       className="ls-card flex items-center gap-lg group"
     >
       {/* Thumbnail */}
-      <div className="w-[208px] h-[208px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
-        {dish.photoURL ? (
-          <Image
+      <div className="relative w-[208px] h-[208px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <UtensilsCrossed size={48} className="text-ls-secondary" />
+        </div>
+        {dish.photoURL && (
+          <OptImage
             src={dish.photoURL}
             alt={dish.name}
             width={416}
             height={416}
-            className="w-full h-full object-cover"
+            sizes="208px"
+            className="relative w-full h-full object-cover"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <UtensilsCrossed size={48} className="text-ls-secondary" />
-          </div>
         )}
       </div>
 

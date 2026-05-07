@@ -17,6 +17,11 @@ service cloud.firestore {
         allow update: if request.auth != null;
         allow delete: if isAdmin();
       }
+
+      match /menuSections/{sectionId} {
+        allow read: if true;
+        allow write: if request.auth != null;
+      }
     }
 
     match /reviews/{id} {
@@ -29,10 +34,32 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if request.auth != null &&
+      // Public profile data is readable by any signed-in user (needed for
+      // Public Profile, share pages, follower lists, LS Feed avatars, etc.).
+      allow read: if request.auth != null;
+
+      allow create, delete: if request.auth != null &&
         (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null &&
-        (request.auth.uid == userId || isAdmin());
+
+      // Owner / admin can change anything. Other signed-in users may only
+      // increment the follower/following counters (used by toggleFollow).
+      allow update: if request.auth != null && (
+        request.auth.uid == userId ||
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['followerCount', 'followingCount'])
+      );
+    }
+
+    match /follows/{followId} {
+      allow read: if request.auth != null;
+      // Doc id format: {followerId}_{followeeId} — only the follower can create/delete.
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.followerId &&
+        followId == (request.resource.data.followerId + "_" + request.resource.data.followeeId);
+      allow delete: if request.auth != null &&
+        request.auth.uid == resource.data.followerId;
+      allow update: if false;
     }
 
     match /picks/{id} {
@@ -55,7 +82,8 @@ service cloud.firestore {
 
     match /pointsLog/{id} {
       allow create: if request.auth != null;
-      allow read: if isAdmin();
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /redemptions/{id} {
@@ -87,10 +115,124 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /blogPosts/{postId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /claimRequests/{id} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if isAdmin();
+    }
+
+    // Rewards & Promotions
+    match /rewards/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /promotions/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /userOffers/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Challenges
+    match /challenges/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      match /submissions/{subId} {
+        allow read: if true;
+        allow create: if request.auth != null;
+        allow update: if isAdmin();
+      }
+    }
+
+    // Analytics — sessions
+    match /sessions/{sessionId} {
+      allow create, update, delete: if true;
+      allow read: if request.auth != null;
+    }
+
+    // Analytics — event log
+    match /eventLog/{eventId} {
+      allow read, create: if true;
+    }
+
+    // Analytics — daily stats (written by Cloud Functions only)
+    match /stats/{dateKey} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Notifications
+    match /notifications/{id} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only Cloud Functions write
+    }
+
+    // Dish Votes (Mon Viet Guide)
+    match /dishVotes/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Game Rooms
+    match /gameRooms/{roomId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+
+      // Hands, rounds, and ledger entries written during the round
+      match /{document=**} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    // Support tickets
+    match /support_tickets/{id} {
+      allow create: if request.auth != null;
+      allow read: if isAdmin();
+    }
+
+    // Feedback / suggestions (Submit form)
+    match /feedback/{id} {
+      allow create: if true;
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Business suggestions (Suggest a Business form)
+    match /businessSuggestions/{id} {
+      allow create: if true;
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+    }
+
+    // Reports
+    match /reports/{id} {
+      allow create: if request.auth != null;
+      allow read: if isAdmin();
+      allow update: if isAdmin();
+    }
+
+    // Recipes
+    match /recipes/{recipeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // CollectionGroup: photos (needed for admin photo feed query)
+    match /{path=**}/photos/{photoId} {
+      allow read: if true;
     }
   }
 }

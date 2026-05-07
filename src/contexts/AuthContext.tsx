@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   sendPasswordResetEmail,
   updateProfile,
@@ -45,12 +47,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await createUserProfile(fbUser.uid, {
         displayName: fbUser.displayName || "",
         email: fbUser.email || "",
-        photoURL: fbUser.photoURL || undefined,
+        ...(fbUser.photoURL ? { photoURL: fbUser.photoURL } : {}),
       });
       profile = await getUserProfile(fbUser.uid);
     }
     setUser(profile);
   };
+
+  // Handle redirect result from Apple Sign-In
+  useEffect(() => {
+    getRedirectResult(auth).then(async (result) => {
+      if (result?.user) {
+        await loadProfile(result.user);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
