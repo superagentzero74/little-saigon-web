@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Firestore } from "firebase-admin/firestore";
 
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: "little-saigon-c055a",
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
+// Lazy-init so Next.js can collect page data at build time without the
+// FIREBASE_* env vars being present (Vercel injects them at runtime, not build).
+let _db: Firestore | null = null;
+function db(): Firestore {
+  if (!_db) {
+    if (!getApps().length) {
+      initializeApp({
+        credential: cert({
+          projectId: "little-saigon-c055a",
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+        }),
+      });
+    }
+    _db = getFirestore();
+  }
+  return _db;
 }
-const db = getFirestore();
 
 const ADMIN_EMAIL = "superagentzero74@gmail.com"; // Resend verified email — change to tuan@productsgo.com after domain verification
 
@@ -67,11 +75,11 @@ export async function POST(request: NextRequest) {
       ticket.newBizAddress = newBizAddress || "";
     }
 
-    await db.collection("support_tickets").add(ticket);
+    await db().collection("support_tickets").add(ticket);
 
     // Also create a claimRequests doc so it shows in admin claims page
     if (isClaim) {
-      await db.collection("claimRequests").add({
+      await db().collection("claimRequests").add({
         businessId: claimBusinessId || "",
         businessName: claimBusinessName || "",
         userId: userId || "",

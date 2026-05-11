@@ -73,7 +73,14 @@ export default function RewardsAdminPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-md mb-2xl">
         <StatCard icon={<Coins size={18} />} label="Total Issued" value={`${stats.totalIssued.toLocaleString()} pts`} sub={`≈ $${issuedUSD}`} color="text-amber-700" bg="bg-amber-50" />
         <StatCard icon={<TrendingUp size={18} />} label="In Circulation" value={`${stats.totalInCirculation.toLocaleString()} pts`} sub={`≈ $${circulationUSD}`} color="text-green-700" bg="bg-green-50" />
-        <StatCard icon={<Users size={18} />} label="Active Earners" value={`${stats.activeUsers}`} sub={`of ${stats.totalUsers} users`} color="text-blue-700" bg="bg-blue-50" />
+        <StatCard
+          icon={<Users size={18} />}
+          label="Active Earners"
+          value={`${stats.activeUsers}`}
+          sub={`${stats.totalUsers > 0 ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}% of ${stats.totalUsers} registered users`}
+          color="text-blue-700"
+          bg="bg-blue-50"
+        />
         <StatCard icon={<MapPin size={18} />} label="Total Check-ins" value={`${stats.totalCheckIns.toLocaleString()}`} sub={`${stats.totalRedeemed} redemptions`} color="text-purple-700" bg="bg-purple-50" />
       </div>
 

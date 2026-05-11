@@ -165,6 +165,23 @@ service cloud.firestore {
       allow read, create: if true;
     }
 
+    // Login attempts — fire-and-forget telemetry. Anyone (auth or not) can
+    // create so failed attempts before sign-in are still captured. Admin-only
+    // read for the dashboard.
+    match /loginAttempts/{id} {
+      allow create: if true;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Search queries — fire-and-forget telemetry of user search activity.
+    // Lets the admin dashboard surface top queries + zero-result queries.
+    match /searchQueries/{id} {
+      allow create: if true;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
     // Analytics — daily stats (written by Cloud Functions only)
     match /stats/{dateKey} {
       allow read: if isAdmin();
@@ -233,6 +250,57 @@ service cloud.firestore {
     // CollectionGroup: photos (needed for admin photo feed query)
     match /{path=**}/photos/{photoId} {
       allow read: if true;
+    }
+
+    // ── Community Forum ───────────────────────────────────────
+    match /forumCategories/{slug} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /forumThreads/{threadId} {
+      allow read: if true;
+      // Author must own the doc on create
+      allow create: if request.auth != null &&
+        request.resource.data.authorId == request.auth.uid;
+      // Owner can edit body/title only. Counters/lastReply updated by anyone
+      // signed in (reply path needs to bump them) or admin.
+      allow update: if request.auth != null &&
+        (resource.data.authorId == request.auth.uid || isAdmin() ||
+         // Counter-only update: replyCount/lastReplyAt/lastReplyBy/upvoteCount changes
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['replyCount', 'lastReplyAt', 'lastReplyBy', 'upvoteCount']));
+      allow delete: if isAdmin() ||
+        (request.auth != null && resource.data.authorId == request.auth.uid);
+
+      match /replies/{replyId} {
+        allow read: if true;
+        allow create: if request.auth != null &&
+          request.resource.data.authorId == request.auth.uid;
+        allow update: if request.auth != null &&
+          (resource.data.authorId == request.auth.uid || isAdmin() ||
+           request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['upvoteCount']));
+        allow delete: if isAdmin() ||
+          (request.auth != null && resource.data.authorId == request.auth.uid);
+
+        match /upvotes/{userId} {
+          allow read: if true;
+          allow create, delete: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+
+      match /upvotes/{userId} {
+        allow read: if true;
+        allow create, delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    match /forumReports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null &&
+        request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
   }
 }

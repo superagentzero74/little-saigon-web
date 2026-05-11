@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { auth } from "@/lib/firebase";
-import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { auth, db } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 type Tab = "login" | "signup";
 
@@ -22,6 +23,39 @@ export default function LoginPage() {
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
+
+  // Login-issue report
+  const [showReport, setShowReport] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [reportEmail, setReportEmail] = useState("");
+  const [reportMethods, setReportMethods] = useState({ email: false, google: false, apple: false });
+  const [reportSent, setReportSent] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  async function submitLoginIssue(e: React.FormEvent) {
+    e.preventDefault();
+    setReportError("");
+    setReportSubmitting(true);
+    try {
+      const methods = Object.entries(reportMethods).filter(([, v]) => v).map(([k]) => k);
+      await addDoc(collection(db, "feedback"), {
+        loginIssue: true,
+        category: "login_issue",
+        email: reportEmail || email,
+        description: reportText,
+        methodsTried: methods,
+        platform: "web",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        createdAt: serverTimestamp(),
+      });
+      setReportSent(true);
+    } catch (err: any) {
+      setReportError(err?.message || "Could not send. Try again.");
+    } finally {
+      setReportSubmitting(false);
+    }
+  }
 
   const redirectAfterLogin = async () => {
     const profile = await import("@/lib/services").then(m => m.getUserProfile(auth.currentUser!.uid));
@@ -259,6 +293,63 @@ export default function LoginPage() {
             {loading ? "..." : tab === "login" ? "Sign In" : "Create Account"}
           </button>
         </form>
+
+        {/* Report login issue */}
+        <div className="mt-xl pt-md border-t border-ls-border text-center">
+          {!showReport ? (
+            <button
+              type="button"
+              onClick={() => { setShowReport(true); setReportEmail(email); }}
+              className="inline-flex items-center gap-xs text-[12px] text-ls-secondary hover:text-ls-primary"
+            >
+              <AlertCircle size={13} />
+              Having trouble signing in?
+            </button>
+          ) : reportSent ? (
+            <div className="text-[13px] text-green-700 bg-green-50 border border-green-200 rounded-btn p-md">
+              Got it. We&apos;ll look into it and follow up if we need more info.
+            </div>
+          ) : (
+            <form onSubmit={submitLoginIssue} className="text-left space-y-sm">
+              <p className="text-[13px] font-semibold text-ls-primary">Report a login issue</p>
+              <input
+                type="email"
+                value={reportEmail}
+                onChange={(e) => setReportEmail(e.target.value)}
+                placeholder="Your email"
+                required
+                className="w-full bg-ls-surface rounded-btn px-md py-[10px] text-[13px] outline-none placeholder:text-ls-secondary"
+              />
+              <div className="flex flex-wrap gap-sm text-[12px] text-ls-secondary">
+                <label className="flex items-center gap-xs">
+                  <input type="checkbox" checked={reportMethods.email} onChange={(e) => setReportMethods({ ...reportMethods, email: e.target.checked })} /> Email + password
+                </label>
+                <label className="flex items-center gap-xs">
+                  <input type="checkbox" checked={reportMethods.google} onChange={(e) => setReportMethods({ ...reportMethods, google: e.target.checked })} /> Google
+                </label>
+                <label className="flex items-center gap-xs">
+                  <input type="checkbox" checked={reportMethods.apple} onChange={(e) => setReportMethods({ ...reportMethods, apple: e.target.checked })} /> Apple
+                </label>
+              </div>
+              <textarea
+                value={reportText}
+                onChange={(e) => setReportText(e.target.value)}
+                placeholder="What happened?"
+                rows={3}
+                className="w-full bg-ls-surface rounded-btn px-md py-[10px] text-[13px] outline-none placeholder:text-ls-secondary resize-none"
+              />
+              {reportError && <p className="text-[12px] text-red-600">{reportError}</p>}
+              <div className="flex gap-sm">
+                <button type="submit" disabled={reportSubmitting} className="ls-btn flex-1 disabled:opacity-50">
+                  {reportSubmitting ? "Sending..." : "Send report"}
+                </button>
+                <button type="button" onClick={() => setShowReport(false)} className="px-md text-[13px] text-ls-secondary hover:text-ls-primary">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

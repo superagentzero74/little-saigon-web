@@ -37,6 +37,16 @@ interface FeedbackEntry {
   text: string;
   pointsAwarded: boolean;
   createdAt?: Date;
+  // Login-issue reports (from /login or iOS AuthView)
+  loginIssue?: boolean;
+  category?: string;
+  description?: string;
+  email?: string;
+  methodsTried?: string[];
+  platform?: "ios" | "web";
+  appVersion?: string;
+  buildNumber?: string;
+  userAgent?: string;
 }
 
 interface SuggestionEntry {
@@ -301,39 +311,71 @@ function TabButton({
 
 function FeedbackList({ entries }: { entries: FeedbackEntry[] }) {
   if (entries.length === 0) return <EmptyState label="No feedback yet" />;
+  // Login-issue reports float to the top
+  const sorted = [...entries].sort((a, b) => {
+    const ai = a.loginIssue ? 1 : 0;
+    const bi = b.loginIssue ? 1 : 0;
+    if (ai !== bi) return bi - ai;
+    return 0;
+  });
   return (
     <div className="space-y-3">
-      {entries.map((e) => (
-        <div key={e.id} className="p-4 bg-white border rounded-lg shadow-sm">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-ls-primary">
-                {displayName(e)}
-              </span>
-              {e.pointsAwarded && (
-                <span className="px-2 py-0.5 text-[10px] font-bold text-white bg-green-600 rounded-full">
-                  PTS
+      {sorted.map((e) => {
+        const isLoginIssue = e.loginIssue === true || e.category === "login_issue";
+        const emailToShow = e.userEmail || e.email || "";
+        const body = e.text || e.description || "";
+        return (
+          <div
+            key={e.id}
+            className={`p-4 bg-white border rounded-lg shadow-sm ${isLoginIssue ? "border-red-300 bg-red-50/30" : ""}`}
+          >
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {isLoginIssue && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold text-white bg-red-600 rounded-full">
+                    LOGIN ISSUE
+                  </span>
+                )}
+                <span className="text-sm font-semibold text-ls-primary">
+                  {displayName(e)}
+                </span>
+                {e.pointsAwarded && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold text-white bg-green-600 rounded-full">
+                    PTS
+                  </span>
+                )}
+                {isLoginIssue && e.platform && (
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500">{e.platform}</span>
+                )}
+                {isLoginIssue && e.methodsTried && e.methodsTried.length > 0 && (
+                  <span className="text-[11px] text-gray-600">tried: {e.methodsTried.join(", ")}</span>
+                )}
+              </div>
+              {e.createdAt && (
+                <span className="text-xs text-gray-400 whitespace-nowrap">
+                  {formatDate(e.createdAt)}
                 </span>
               )}
             </div>
-            {e.createdAt && (
-              <span className="text-xs text-gray-400 whitespace-nowrap">
-                {formatDate(e.createdAt)}
-              </span>
+            {emailToShow && (
+              <a
+                href={`mailto:${emailToShow}`}
+                className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2"
+              >
+                <Mail size={11} />
+                {emailToShow}
+              </a>
+            )}
+            <p className="text-sm text-gray-800 whitespace-pre-wrap">{body}</p>
+            {isLoginIssue && (e.appVersion || e.userAgent) && (
+              <div className="mt-2 text-[11px] text-gray-500">
+                {e.appVersion && <>v{e.appVersion} ({e.buildNumber}) </>}
+                {e.userAgent && <span className="break-all">{e.userAgent.slice(0, 100)}</span>}
+              </div>
             )}
           </div>
-          {e.userEmail && (
-            <a
-              href={`mailto:${e.userEmail}`}
-              className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline mb-2"
-            >
-              <Mail size={11} />
-              {e.userEmail}
-            </a>
-          )}
-          <p className="text-sm text-gray-800 whitespace-pre-wrap">{e.text}</p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

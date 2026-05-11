@@ -122,12 +122,14 @@ export interface BusinessPhoto {
   businessId: string;
   userId?: string;
   userName?: string;
+  uploadedBy?: string | null; // null = legacy/scraped, string = user UID
   url: string;
   tag: PhotoTag;
   foodTags?: string[];
   description?: string;
   order?: number;
   feedApproved?: boolean;
+  reviewed?: boolean; // marks scraped photo as audited/kept
   createdAt?: any;
 }
 

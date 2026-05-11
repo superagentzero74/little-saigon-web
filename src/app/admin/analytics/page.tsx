@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity, Users, Eye, UserPlus, Coins, QrCode, Gift, TrendingUp,
-  Smartphone, Globe, Clock
+  Smartphone, Globe, Clock, Power, Loader2
 } from "lucide-react";
+import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAdminStats, useLiveUsers, useWeeklyStats } from "@/hooks/useAdminDashboard";
 import type { DailyStats } from "@/hooks/useAdminDashboard";
 
@@ -81,6 +83,9 @@ export default function AnalyticsDashboard() {
           </div>
         ))}
       </div>
+
+      {/* App Opens */}
+      <AppOpensPanel />
 
       {/* Weekly trend */}
       <div className="bg-white rounded-card border border-ls-border p-lg mb-2xl">
@@ -207,4 +212,201 @@ export default function AnalyticsDashboard() {
       )}
     </div>
   );
+}
+
+// ─── App Opens Panel ──────────────────────────────────────────────────────
+
+function AppOpensPanel() {
+  const [counts, setCounts] = useState<{ date: string; count: number }[] | null>(null);
+  const [hourly, setHourly] = useState<number[] | null>(null);
+  const [excludedCount, setExcludedCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    const since = new Date();
+    since.setDate(since.getDate() - 29); // last 30 days inclusive
+    since.setHours(0, 0, 0, 0);
+
+    setLoading(true);
+    setErr(null);
+    (async () => {
+      try {
+        // Fetch admin UIDs to exclude their activity from the analytics.
+        const adminSnap = await getDocs(
+          query(collection(db, "users"), where("role", "==", "admin"))
+        );
+        const adminUids = new Set<string>(adminSnap.docs.map((d) => d.id));
+
+        const q = query(
+          collection(db, "eventLog"),
+          where("event", "==", "app_open"),
+          where("timestamp", ">=", since),
+          orderBy("timestamp", "asc")
+        );
+        const snap = await getDocs(q);
+
+        // Build a 30-day buckets array, all zero, indexed by YYYY-MM-DD
+        const buckets: Record<string, number> = {};
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(since);
+          d.setDate(d.getDate() + i);
+          buckets[dayKey(d)] = 0;
+        }
+
+        // 24-hour buckets (local time)
+        const hourBuckets: number[] = Array(24).fill(0);
+        let excluded = 0;
+
+        snap.forEach((doc) => {
+          const data = doc.data();
+          const uid = data.userId as string | undefined;
+          if (uid && adminUids.has(uid)) {
+            excluded += 1;
+            return;
+          }
+          const ts = (data.timestamp as { toDate?: () => Date })?.toDate?.();
+          if (!ts) return;
+          const k = dayKey(ts);
+          if (k in buckets) buckets[k] += 1;
+          hourBuckets[ts.getHours()] += 1;
+        });
+
+        const series = Object.entries(buckets)
+          .sort(([a], [b]) => (a < b ? -1 : 1))
+          .map(([date, count]) => ({ date, count }));
+        setCounts(series);
+        setHourly(hourBuckets);
+        setExcludedCount(excluded);
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const today = counts?.[counts.length - 1]?.count ?? 0;
+  const yesterday = counts?.[counts.length - 2]?.count ?? 0;
+  const last7 = counts ? sumLast(counts, 7) : 0;
+  const last30 = counts ? counts.reduce((s, x) => s + x.count, 0) : 0;
+  const max = counts ? Math.max(...counts.slice(-14).map((x) => x.count), 1) : 1;
+
+  return (
+    <div className="bg-white rounded-card border border-ls-border p-lg mb-2xl">
+      <div className="flex items-center gap-sm mb-lg">
+        <Power size={16} className="text-ls-secondary" />
+        <h2 className="text-[14px] font-semibold text-ls-primary">App Opens</h2>
+        <span className="text-[12px] text-ls-secondary">(every cold-launch / foreground)</span>
+        {excludedCount > 0 && (
+          <span className="ml-auto text-[11px] text-ls-secondary">
+            excluding {excludedCount.toLocaleString()} admin opens
+          </span>
+        )}
+      </div>
+
+      {err && <div className="text-[13px] text-red-600 mb-md">{err}</div>}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-md mb-lg">
+        <Stat label="Today" value={today} loading={loading} />
+        <Stat label="Yesterday" value={yesterday} loading={loading} />
+        <Stat label="Last 7 days" value={last7} loading={loading} />
+        <Stat label="Last 30 days" value={last30} loading={loading} />
+      </div>
+
+      <p className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide mb-sm">Last 14 days</p>
+      {loading ? (
+        <div className="h-[100px] flex items-center justify-center text-ls-secondary">
+          <Loader2 size={16} className="animate-spin" />
+        </div>
+      ) : (
+        <div className="flex items-end gap-[4px] h-[100px]">
+          {counts?.slice(-14).map((d) => {
+            const h = Math.max((d.count / max) * 100, 4);
+            const dayLabel = new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+            return (
+              <div key={d.date} className="flex-1 flex flex-col items-center gap-xs">
+                <span className="text-[10px] text-ls-secondary">{d.count || ""}</span>
+                <div className="w-full bg-violet-200 rounded-t" style={{ height: `${h}%` }} />
+                <span className="text-[9px] text-ls-secondary">{dayLabel}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide mt-lg mb-sm">
+        By hour of day <span className="text-[10px] font-normal normal-case">(last 30 days, your local time)</span>
+      </p>
+      {loading ? (
+        <div className="h-[120px] flex items-center justify-center text-ls-secondary">
+          <Loader2 size={16} className="animate-spin" />
+        </div>
+      ) : (
+        <div className="flex items-end gap-[2px]">
+          {hourly?.map((c, hr) => {
+            const hMax = Math.max(...(hourly || [1]), 1);
+            const barPx = Math.max((c / hMax) * 100, 2);
+            const showLabel = hr % 3 === 0;
+            const isPeak = hr === peakHour(hourly);
+            return (
+              <div
+                key={hr}
+                className="flex-1 flex flex-col items-center"
+                title={`${formatHour(hr)} — ${c}`}
+              >
+                <span className="text-[9px] text-ls-secondary leading-none h-[12px] mb-[2px]">
+                  {c > 0 && isPeak ? c : ""}
+                </span>
+                <div
+                  className={`w-full rounded-t ${isPeak ? "bg-ls-primary" : "bg-violet-300"}`}
+                  style={{ height: `${barPx}px` }}
+                />
+                <span className="text-[9px] text-ls-secondary leading-none h-[12px] mt-[4px]">
+                  {showLabel ? formatHour(hr).replace(":00 ", "") : ""}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatHour(hr: number): string {
+  const am = hr < 12;
+  const h12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+  return `${h12}:00 ${am ? "AM" : "PM"}`;
+}
+
+function peakHour(arr: number[] | null): number {
+  if (!arr) return -1;
+  let best = -1, bestVal = -1;
+  arr.forEach((v, i) => {
+    if (v > bestVal) { bestVal = v; best = i; }
+  });
+  return best;
+}
+
+function Stat({ label, value, loading }: { label: string; value: number; loading: boolean }) {
+  return (
+    <div className="bg-ls-surface rounded-card p-md">
+      <p className="text-[11px] font-semibold text-ls-secondary uppercase tracking-wide">{label}</p>
+      <p className="text-[22px] font-bold text-ls-primary mt-[2px]">
+        {loading ? "—" : value.toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+function dayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function sumLast(series: { count: number }[], n: number): number {
+  return series.slice(-n).reduce((s, x) => s + x.count, 0);
 }

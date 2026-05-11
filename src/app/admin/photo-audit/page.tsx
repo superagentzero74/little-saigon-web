@@ -187,7 +187,11 @@ export default function PhotoAuditPage() {
         <div>
           <h1 className="text-[24px] font-bold text-ls-primary">Photo Audit</h1>
           <p className="text-[14px] text-ls-secondary mt-xs">
-            Review and fix business photos across all listings
+            Review and fix business photos across all listings.{" "}
+            <Link href="/admin/photo-replacement-queue" className="underline text-ls-primary hover:opacity-80">
+              See Replacement Queue notes
+            </Link>{" "}
+            for the auto-refresh Cloud Function and how to terminate it.
           </p>
         </div>
         <div className="flex items-center gap-md">

@@ -14,9 +14,30 @@ import {
   updatePassword,
   User,
 } from "firebase/auth";
-import { auth, googleProvider, appleProvider } from "@/lib/firebase";
+import { auth, googleProvider, appleProvider, db } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { getUserProfile, createUserProfile, updateUserProfile } from "@/lib/services";
 import type { AppUser } from "@/lib/types";
+
+// Fire-and-forget login telemetry for the admin dashboard.
+async function recordLoginAttempt(
+  method: "email" | "google" | "apple",
+  outcome: "success" | "failure",
+  extra: { email?: string; userId?: string; errorCode?: string; errorMessage?: string } = {}
+) {
+  try {
+    await addDoc(collection(db, "loginAttempts"), {
+      method,
+      outcome,
+      platform: "web",
+      timestamp: serverTimestamp(),
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      ...extra,
+    });
+  } catch {
+    /* swallow — telemetry should never break sign-in */
+  }
+}
 
 interface AuthContextType {
   firebaseUser: User | null;
@@ -77,28 +98,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginWithEmail = async (email: string, password: string) => {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    await loadProfile(cred.user);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await loadProfile(cred.user);
+      recordLoginAttempt("email", "success", { email, userId: cred.user.uid });
+    } catch (err: any) {
+      recordLoginAttempt("email", "failure", { email, errorCode: err?.code, errorMessage: err?.message });
+      throw err;
+    }
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName });
-    await createUserProfile(cred.user.uid, {
-      displayName,
-      email: cred.user.email || email,
-    });
-    await loadProfile(cred.user);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(cred.user, { displayName });
+      await createUserProfile(cred.user.uid, {
+        displayName,
+        email: cred.user.email || email,
+      });
+      await loadProfile(cred.user);
+      recordLoginAttempt("email", "success", { email, userId: cred.user.uid });
+    } catch (err: any) {
+      recordLoginAttempt("email", "failure", { email, errorCode: err?.code, errorMessage: err?.message });
+      throw err;
+    }
   };
 
   const loginWithGoogle = async () => {
-    const cred = await signInWithPopup(auth, googleProvider);
-    await loadProfile(cred.user);
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      await loadProfile(cred.user);
+      recordLoginAttempt("google", "success", { email: cred.user.email ?? undefined, userId: cred.user.uid });
+    } catch (err: any) {
+      recordLoginAttempt("google", "failure", { errorCode: err?.code, errorMessage: err?.message });
+      throw err;
+    }
   };
 
   const loginWithApple = async () => {
-    const cred = await signInWithPopup(auth, appleProvider);
-    await loadProfile(cred.user);
+    try {
+      const cred = await signInWithPopup(auth, appleProvider);
+      await loadProfile(cred.user);
+      recordLoginAttempt("apple", "success", { email: cred.user.email ?? undefined, userId: cred.user.uid });
+    } catch (err: any) {
+      recordLoginAttempt("apple", "failure", { errorCode: err?.code, errorMessage: err?.message });
+      throw err;
+    }
   };
 
   const logout = async () => {

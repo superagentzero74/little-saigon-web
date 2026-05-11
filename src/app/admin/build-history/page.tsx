@@ -13,6 +13,30 @@ type Milestone = {
 
 const MILESTONES: Milestone[] = [
   {
+    date: "2026-05-07",
+    title: "iOS v1.32 (1) to TestFlight + user-feedback fixes pass",
+    summary:
+      "Bundled the past few days of UI / layout / nav fixes plus a sweep of user-reported bugs into a single TestFlight build. Web rules + auth handler also shipped.",
+    platforms: ["iOS", "Web", "Backend"],
+    details: [
+      "iOS v1.32 (1) uploaded via API-key auth + altool (Delivery UUID 38af0a25-fe26-4be5-b9b2-60d14fb572b0).",
+      "MainTabView wraps My Page in a stable container view — fixes blank tab after sign-out → sign-in.",
+      "Hamburger nav: Food Guide pushes MonVietGuideView, My Offers pushes WalletView.",
+      "Edit Profile: single top-right Save button covers photo + name + bio + social links; Save Photo no longer reopens the picker (.buttonStyle(.borderless) on the button).",
+      "Newcomer level chip on Rewards card now renders white on the dark Color.lsPrimary background.",
+      "Rewards earn cards display canonical award amounts (+25 / +10 / +15) — matches POINTS in code.",
+      "PublicProfileView falls back to a uid-field query when the doc-id lookup misses (handles legacy users keyed differently).",
+      "LS Feed avatar/author tap prefers the loaded business when the photo is flagged as a business photo OR has no user attribution OR the user lookup fails.",
+      "FeedService now fans out business + user lookups in parallel via withTaskGroup — drops a 50-photo feed from ~100 sequential round-trips to two batches.",
+      "Web Firestore rules deployed: /users readable to any signed-in user; counter-only updates allowed cross-user (toggleFollow's increment writes); /follows/{id} rule with strict {followerId}_{followeeId} doc-id check. Fixes 'Missing or insufficient permissions' on follow.",
+      "Web /auth/action page handles Firebase action codes (resetPassword / verifyEmail / recoverEmail) — ready for Firebase Console 'Customize action URL' flip.",
+      "Web Header: moved admin early-return after all hooks (Rules of Hooks fix — likely cause of 'empty div' on mobile).",
+      "Web layout: explicit viewport export.",
+      "Favicon + apple-touch-icon auto-emitted from /app/icon.png.",
+      "Google Maps JS API loaded with loading=async on /guide/[slug].",
+    ],
+  },
+  {
     date: "2026-05-06",
     title: "Web UI mirror of iOS banner overhaul + Tiến Lên multiplayer landscape rework",
     summary:

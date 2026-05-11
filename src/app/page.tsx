@@ -58,12 +58,11 @@ export default function HomePage() {
           <div className="absolute inset-0 flex flex-col justify-end pointer-events-none">
             <div className="px-xl pb-lg md:pb-2xl">
               <Image
-                src="/images/di-an-choi.svg"
+                src="/images/di-an-choi-wht.png"
                 alt="Đi Ăn Chơi!"
-                width={1200}
+                width={900}
                 height={300}
                 className="w-[260px] md:w-[380px] h-auto"
-                style={{ filter: "brightness(0) invert(1)" }}
                 priority
               />
               <p className="text-[12px] md:text-[14px] text-white/90 mt-sm max-w-lg">
@@ -83,12 +82,16 @@ export default function HomePage() {
           <div className="ls-container">
             <style>{`
               @keyframes slideInFromRight {
-                from { transform: translateX(60px); opacity: 0; }
+                from { transform: translateX(120px); opacity: 0; }
                 to { transform: translateX(0); opacity: 1; }
               }
-              .promo-slide-in { animation: slideInFromRight 0.6s ease-out both; }
+              .promo-slide-in {
+                animation: slideInFromRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+              }
             `}</style>
-            <div className="flex gap-[6px] sm:gap-md overflow-x-auto pb-sm scrollbar-hide">
+            {/* Mobile: horizontal scroll w/ fixed-width banners. */}
+            {/* sm+: flex with each banner taking equal share of container, so they scale up with page width. */}
+            <div className="flex gap-[6px] sm:gap-md overflow-x-auto sm:overflow-visible pb-sm scrollbar-hide">
               {promoBanners.map((banner, idx) => {
                 const href =
                   banner.linkType === "search"
@@ -105,27 +108,29 @@ export default function HomePage() {
 
                     : banner.linkValue;
                 const isExternal = banner.linkType === "url";
+                const wrapperClass =
+                  "flex-shrink-0 sm:flex-shrink sm:flex-1 sm:basis-0 sm:min-w-0 w-[calc((100vw-44px)/3)] sm:w-auto overflow-hidden group promo-slide-in";
                 const img = (
                   <div
-                    className="flex-shrink-0 w-[calc((100vw-44px)/3)] sm:w-auto overflow-hidden group promo-slide-in"
-                    style={{ animationDelay: `${idx * 0.1}s` }}
+                    className={wrapperClass}
+                    style={{ animationDelay: `${idx * 0.15}s` }}
                   >
                     <OptImage
                       src={banner.imageURL}
                       alt=""
                       width={440}
                       height={650}
-                      sizes="(min-width: 640px) 220px, 33vw"
-                      className="w-full h-auto sm:h-full sm:w-auto object-cover transition-transform duration-300 group-hover:scale-105 sm:max-h-[374px]"
+                      sizes="(min-width: 1024px) 360px, (min-width: 640px) 33vw, 33vw"
+                      className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   </div>
                 );
                 return isExternal ? (
-                  <a key={banner.id} href={href} target="_blank" rel="noopener noreferrer">
+                  <a key={banner.id} href={href} target="_blank" rel="noopener noreferrer" className="sm:flex-1 sm:min-w-0">
                     {img}
                   </a>
                 ) : (
-                  <Link key={banner.id} href={href}>
+                  <Link key={banner.id} href={href} className="sm:flex-1 sm:min-w-0">
                     {img}
                   </Link>
                 );

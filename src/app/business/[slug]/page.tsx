@@ -17,6 +17,7 @@ import {
   MapPin, Phone, Globe, Clock, Star, ChevronLeft, Heart,
   Navigation, Camera, MessageSquare, CheckCircle, X,
   UtensilsCrossed, BookOpen, TreePine, Home, GlassWater, LayoutGrid, Building2,
+  Bookmark, Share2,
 } from "lucide-react";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -27,6 +28,38 @@ function formatHours(hours?: string[]): { day: string; time: string }[] {
     const parts = h.split(": ");
     return { day: parts[0] || "", time: parts.slice(1).join(": ") || h };
   });
+}
+
+/**
+ * iOS-style action tile: vertical stack of icon + caption, light gray bg,
+ * rounded 10px, equal-width when used in a grid. Tap target ≥44pt.
+ */
+type ActionTileProps = {
+  icon: React.ReactNode;
+  label: string;
+} & (
+  | { as?: "button"; onClick?: () => void; href?: never; target?: never; rel?: never }
+  | { as: "a"; href: string; target?: string; rel?: string; onClick?: never }
+);
+function ActionTile(props: ActionTileProps) {
+  const className =
+    "flex flex-col items-center justify-center gap-[5px] bg-ls-surface text-ls-primary " +
+    "rounded-[10px] py-[12px] hover:bg-ls-border active:opacity-80 transition-colors " +
+    "min-h-[60px]";
+  if (props.as === "a") {
+    return (
+      <a href={props.href} target={props.target} rel={props.rel} className={className}>
+        <span className="text-ls-primary">{props.icon}</span>
+        <span className="text-[12px] font-medium">{props.label}</span>
+      </a>
+    );
+  }
+  return (
+    <button type="button" onClick={props.onClick} className={className}>
+      <span className="text-ls-primary">{props.icon}</span>
+      <span className="text-[12px] font-medium">{props.label}</span>
+    </button>
+  );
 }
 
 function StarRating({ rating, size = 16 }: { rating: number; size?: number }) {
@@ -485,40 +518,166 @@ export default function BusinessDetailPage() {
       )}
 
       <div className="ls-container max-w-3xl mx-auto">
-        {/* Action Buttons */}
+        {/* Description */}
+        {business.description && (
+          <p className="text-[14px] text-ls-body mt-md leading-relaxed">{business.description}</p>
+        )}
+
+        {/* Menu — promoted directly under title/slider when the business has
+            a populated menu. Empty-state ("Help us build this menu") still
+            renders in its original late slot below. */}
+        {menuSections.length > 0 && (() => {
+          const allItems = menuSections.flatMap((s) => s.items).filter((i) => i.available !== false);
+          const highlights = allItems
+            .filter((i) => i.photoUrl && i.photoUrl.length > 0)
+            .slice(0, 10);
+          return (
+            <div className="mt-xl">
+              <div className="flex items-center justify-between mb-md">
+                <h2 className="text-section-header text-ls-primary flex items-center gap-sm">
+                  <BookOpen size={18} /> Menu
+                </h2>
+                <Link
+                  href={`/business/${slug}/menu`}
+                  className="flex items-center gap-xs text-[13px] font-semibold text-ls-primary hover:underline"
+                >
+                  Full Menu <span className="text-[11px]">→</span>
+                </Link>
+              </div>
+              {highlights.length > 0 ? (
+                <>
+                  <p className="text-[13px] font-semibold text-ls-primary mb-sm">Popular Dishes</p>
+                  <div className="flex gap-md overflow-x-auto pb-sm scrollbar-hide">
+                    {highlights.map((item) => (
+                      <div key={item.id} className="shrink-0 w-[140px]">
+                        <div className="w-[140px] h-[140px] rounded-card overflow-hidden bg-ls-surface">
+                          <img src={item.photoUrl!} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
+                        </div>
+                        <p className="text-[13px] font-semibold text-ls-primary mt-xs truncate">{item.nameVi || item.name}</p>
+                        {item.nameVi && <p className="text-[11px] text-ls-secondary truncate">{item.name}</p>}
+                        {item.price != null && (
+                          <p className="text-[12px] font-semibold text-ls-primary">${item.price.toFixed(2)}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (() => {
+                // Text-only preview: a few items so the menu doesn't look empty.
+                const popular = allItems.filter((i) =>
+                  i.tags?.includes("popular") ||
+                  i.tags?.some((t) => t.endsWith("-featured"))
+                );
+                const preview = (popular.length > 0 ? popular : allItems).slice(0, 4);
+                return (
+                  <>
+                    <p className="text-[13px] font-semibold text-ls-primary mb-sm">From the menu</p>
+                    <div className="rounded-card border border-ls-border overflow-hidden bg-white">
+                      {preview.map((item, i) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-baseline gap-md px-md py-sm ${i < preview.length - 1 ? "border-b border-ls-border" : ""}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-medium text-ls-primary truncate">{item.name}</p>
+                            {item.nameVi && (
+                              <p className="text-[11px] text-ls-secondary truncate">{item.nameVi}</p>
+                            )}
+                          </div>
+                          {item.price != null ? (
+                            <span className="text-[13px] font-semibold text-ls-primary shrink-0">${item.price.toFixed(2)}</span>
+                          ) : item.priceNote ? (
+                            <span className="text-[11px] text-ls-secondary shrink-0">{item.priceNote}</span>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+              <Link
+                href={`/business/${slug}/menu`}
+                className="block w-full text-center text-[14px] font-semibold text-white bg-ls-primary hover:opacity-90 rounded-btn py-[10px] mt-md transition-opacity"
+              >
+                See Full Menu
+              </Link>
+            </div>
+          );
+        })()}
+
+        {/* Action tiles — mirrors the iOS BusinessDetailView actionRow:
+            equal-width tiles, vertical icon-on-top + caption-below,
+            light-gray bg, rounded 10px, 44pt+ touch target. */}
+        <div className="grid grid-cols-5 gap-[10px] mt-xl">
+          <ActionTile
+            icon={isFavorite ? <Bookmark size={18} className="fill-current" /> : <Bookmark size={18} />}
+            label={isFavorite ? "Saved" : "Save"}
+            onClick={handleToggleFavorite}
+          />
+          <ActionTile
+            icon={<Heart size={18} />}
+            label="Favorite"
+            onClick={() => user ? handleToggleFavorite() : router.push("/login")}
+          />
+          <ActionTile
+            as="a"
+            href={directionsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            icon={<Navigation size={18} />}
+            label="Directions"
+          />
+          {business.phone ? (
+            <ActionTile
+              as="a"
+              href={`tel:${business.phone.replace(/[^0-9+]/g, "")}`}
+              icon={<Phone size={18} />}
+              label="Call"
+            />
+          ) : (
+            <ActionTile
+              icon={<MessageSquare size={18} />}
+              label="Review"
+              onClick={() => user ? setShowReviewForm(true) : router.push("/login")}
+            />
+          )}
+          <ActionTile
+            icon={<Share2 size={18} />}
+            label="Share"
+            onClick={() => {
+              const url = typeof window !== "undefined" ? window.location.href : "";
+              if (typeof navigator !== "undefined" && navigator.share) {
+                navigator.share({ title: business.name, url }).catch(() => {});
+              } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+                navigator.clipboard.writeText(url).catch(() => {});
+              }
+            }}
+          />
+        </div>
+
+        {/* Secondary actions row — Check In + Review */}
         <div className="flex flex-wrap gap-sm mt-md">
           <button
             onClick={handleCheckIn}
             disabled={checkingIn}
-            className="flex items-center gap-xs bg-ls-primary text-white text-[13px] font-medium px-lg py-sm rounded-btn hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-xs bg-ls-primary text-white text-[13px] font-medium px-lg py-[10px] rounded-btn hover:opacity-90 disabled:opacity-50"
           >
             <CheckCircle size={16} /> {checkingIn ? "Checking in..." : "Check In"}
           </button>
-          <a
-            href={directionsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-xs bg-ls-surface text-ls-primary text-[13px] font-medium px-lg py-sm rounded-btn hover:bg-ls-border"
-          >
-            <Navigation size={16} /> Directions
-          </a>
-          <button
-            onClick={() => user ? setShowReviewForm(true) : router.push("/login")}
-            className="flex items-center gap-xs bg-ls-surface text-ls-primary text-[13px] font-medium px-lg py-sm rounded-btn hover:bg-ls-border"
-          >
-            <MessageSquare size={16} /> Review
-          </button>
+          {business.phone && (
+            <button
+              onClick={() => user ? setShowReviewForm(true) : router.push("/login")}
+              className="flex items-center gap-xs bg-ls-surface text-ls-primary text-[13px] font-medium px-lg py-[10px] rounded-btn hover:bg-ls-border"
+            >
+              <MessageSquare size={16} /> Review
+            </button>
+          )}
         </div>
 
         {(checkInMsg || reviewMsg) && (
           <p className={`text-[13px] mt-sm ${(checkInMsg || reviewMsg).includes("failed") || (checkInMsg || reviewMsg).includes("Failed") ? "text-red-600" : "text-green-600"}`}>
             {checkInMsg || reviewMsg}
           </p>
-        )}
-
-        {/* Description */}
-        {business.description && (
-          <p className="text-[14px] text-ls-body mt-md leading-relaxed">{business.description}</p>
         )}
 
         {/* Info + Map — two column layout */}
@@ -702,81 +861,20 @@ export default function BusinessDetailPage() {
           )}
         </div>
 
-        {/* Menu */}
-        <div className="mt-xl">
-          <div className="flex items-center justify-between mb-md">
-            <h2 className="text-section-header text-ls-primary flex items-center gap-sm">
-              <BookOpen size={18} /> Menu
-            </h2>
-            {menuSections.length > 0 && (
-              <Link
-                href={`/business/${slug}/menu`}
-                className="flex items-center gap-xs text-[13px] font-semibold text-ls-primary hover:underline"
-              >
-                Full Menu <span className="text-[11px]">→</span>
-              </Link>
-            )}
-          </div>
-          {(() => {
-            // Popular items: items with photos or tagged "popular"
-            const allItems = menuSections.flatMap((s) => s.items).filter((i) => i.available !== false);
-            const popular = allItems.filter((i) => (i.photoUrl && i.photoUrl.length > 0) || i.tags?.includes("popular"));
-            const highlights = popular.length > 0 ? popular.slice(0, 10) : allItems.slice(0, 6);
-
-            if (menuSections.length > 0 && highlights.length > 0) {
-              return (
-                <div>
-                  <p className="text-[13px] font-semibold text-ls-primary mb-sm">Popular Dishes</p>
-                  <div className="flex gap-md overflow-x-auto pb-sm scrollbar-hide">
-                    {highlights.map((item) => (
-                      <div key={item.id} className="shrink-0 w-[140px]">
-                        <div className="w-[140px] h-[140px] rounded-card overflow-hidden bg-ls-surface">
-                          {item.photoUrl ? (
-                            <img src={item.photoUrl} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <UtensilsCrossed size={28} className="text-ls-secondary/40" />
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-[13px] font-semibold text-ls-primary mt-xs truncate">{item.nameVi || item.name}</p>
-                        {item.nameVi && <p className="text-[11px] text-ls-secondary truncate">{item.name}</p>}
-                        {item.price != null && (
-                          <p className="text-[12px] font-semibold text-ls-primary">${item.price.toFixed(2)}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <Link
-                    href={`/business/${slug}/menu`}
-                    className="block w-full text-center text-[14px] font-semibold text-white bg-ls-primary hover:opacity-90 rounded-btn py-[10px] mt-md transition-opacity"
-                  >
-                    See Full Menu
-                  </Link>
-                </div>
-              );
-            }
-
-            if (menuSections.length > 0) {
-              return (
-                <Link
-                  href={`/business/${slug}/menu`}
-                  className="block w-full text-center text-[14px] font-semibold text-white bg-ls-primary hover:opacity-90 rounded-btn py-[10px] transition-opacity"
-                >
-                  See Full Menu
-                </Link>
-              );
-            }
-
-            if (business.menuImageUrl) {
-              return (
-                <div className="ls-card overflow-hidden p-0">
-                  <img src={business.menuImageUrl} alt={`${business.name} menu`} className="w-full h-auto" loading="lazy" />
-                </div>
-              );
-            }
-
-            return (
+        {/* Menu empty-state — only renders when the business has NO populated
+            menuSections. Populated menus are promoted up under the title (above). */}
+        {menuSections.length === 0 && (
+          <div className="mt-xl">
+            <div className="flex items-center justify-between mb-md">
+              <h2 className="text-section-header text-ls-primary flex items-center gap-sm">
+                <BookOpen size={18} /> Menu
+              </h2>
+            </div>
+            {business.menuImageUrl ? (
+              <div className="ls-card overflow-hidden p-0">
+                <img src={business.menuImageUrl} alt={`${business.name} menu`} className="w-full h-auto" loading="lazy" />
+              </div>
+            ) : (
               <div className="ls-card text-center py-xl bg-ls-surface border-0">
                 <Camera size={32} className="text-ls-secondary mx-auto" />
                 <p className="text-[15px] font-semibold text-ls-primary mt-md">Help Us Build This Menu</p>
@@ -784,9 +882,9 @@ export default function BusinessDetailPage() {
                   Know this restaurant? Help us digitize their menu by submitting photos of their food and menu.
                 </p>
               </div>
-            );
-          })()}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Photo Grid */}
         {allPhotoUrls.length > 1 && (

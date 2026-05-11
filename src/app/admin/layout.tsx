@@ -5,16 +5,19 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket, Calendar, ScanLine, Bell, Tags, Coins, Flag, Camera, FileText, Activity, Trophy, ThumbsUp, Gamepad2, TrendingUp, Heart, UtensilsCrossed, Inbox, History,
+  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket, Calendar, ScanLine, Bell, Tags, Coins, Flag, Camera, FileText, Activity, Trophy, ThumbsUp, Gamepad2, TrendingUp, Heart, UtensilsCrossed, Inbox, History, KeyRound, Search, MessageSquare,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 type NavGroup = { group: string; items: NavItem[] };
 
+const HOME: NavItem = { href: "/admin", label: "Home", icon: LayoutDashboard, exact: true };
+
 const NAV: (NavItem | NavGroup)[] = [
-  { href: "/admin", label: "Home", icon: LayoutDashboard, exact: true },
   { group: "Analytics & Tracking", items: [
     { href: "/admin/analytics", label: "Analytics", icon: Activity },
+    { href: "/admin/login-attempts", label: "Login Attempts", icon: KeyRound },
+    { href: "/admin/search-queries", label: "Search Queries", icon: Search },
     { href: "/admin/popular", label: "Popular", icon: TrendingUp },
     { href: "/admin/game-stats", label: "Game Stats", icon: Gamepad2 },
     { href: "/admin/votes", label: "Votes", icon: ThumbsUp },
@@ -28,6 +31,7 @@ const NAV: (NavItem | NavGroup)[] = [
     { href: "/admin/blog", label: "Blog", icon: FileText },
     { href: "/admin/recipes", label: "Recipes", icon: UtensilsCrossed },
     { href: "/admin/photo-audit", label: "Photo Manager", icon: Camera },
+    { href: "/admin/photo-replacement-queue", label: "Replacement Queue", icon: Camera },
     { href: "/admin/photo-feed", label: "Photo Feed", icon: Heart },
   ]},
   { group: "Promotions & Events", items: [
@@ -44,6 +48,7 @@ const NAV: (NavItem | NavGroup)[] = [
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/admin/claims", label: "Claims", icon: Building2 },
     { href: "/admin/inbox", label: "Inbox", icon: Inbox },
+    { href: "/admin/community/reports", label: "Forum Reports", icon: MessageSquare },
   ]},
   { group: "Settings", items: [
     { href: "/admin/settings", label: "Page Settings", icon: Settings },
@@ -99,6 +104,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="text-[11px] font-semibold uppercase tracking-widest text-white/50 mb-[2px]">Admin</p>
           <p className="text-[15px] font-bold">Little Saigon</p>
         </div>
+        {/* Home — pinned outside the scrollable nav so it's always reachable */}
+        {(() => {
+          const active = pathname === HOME.href;
+          const Icon = HOME.icon;
+          return (
+            <Link
+              href={HOME.href}
+              className={`flex items-center gap-sm px-lg py-[10px] text-[13px] font-medium border-b border-white/10 transition-colors ${
+                active ? "bg-white/15 text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Icon size={16} />
+              {HOME.label}
+            </Link>
+          );
+        })()}
         <nav className="flex-1 py-md overflow-y-auto">
           {NAV.map((item, idx) => {
             if ("group" in item) {

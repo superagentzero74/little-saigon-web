@@ -128,8 +128,42 @@ export async function deleteSubcategory(slug: string): Promise<void> {
   await deleteDoc(doc(db, "subcategories", slug));
 }
 
+// Search-key normalizer: strips diacritics, lowercases, replaces \u0111\u2192d, drops
+// every non-alphanumeric. This makes "H\u00e0 N\u1ed9i" / "ha noi" / "hanoi" all hash to
+// "hanoi" and "Ph\u1edfholic" / "pho holic" / "phoholic" all hash to "phoholic".
 function normalizeStr(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\u0111/g, "d")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+// Search-query telemetry. Per-keystroke calls collapse to one Firestore write
+// after 1s of typing inactivity, with the latest query + result count.
+let searchLogTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSearch: { query: string; resultCount: number; source: string } | null = null;
+
+function logSearchQuery(query: string, resultCount: number, source: string) {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return; // skip 1-char noise
+  pendingSearch = { query: trimmed, resultCount, source };
+  if (searchLogTimer) clearTimeout(searchLogTimer);
+  searchLogTimer = setTimeout(() => {
+    if (!pendingSearch) return;
+    const { query, resultCount, source } = pendingSearch;
+    pendingSearch = null;
+    addDoc(collection(db, "searchQueries"), {
+      query,
+      normalized: normalizeStr(query),
+      resultCount,
+      source,
+      platform: "web",
+      timestamp: serverTimestamp(),
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    }).catch(() => { /* swallow \u2014 telemetry should never break search */ });
+  }, 1000);
 }
 
 export async function searchBusinesses(searchQuery: string): Promise<Business[]> {
@@ -138,13 +172,14 @@ export async function searchBusinesses(searchQuery: string): Promise<Business[]>
   const snap = await getDocs(q);
   const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Business[];
   const needle = normalizeStr(searchQuery);
-  return all
+  const results = all
     .filter(
       (b) =>
         normalizeStr(b.name).includes(needle) ||
         normalizeStr(b.address || "").includes(needle) ||
         normalizeStr(b.category || "").includes(needle) ||
-        (b.tags || []).some((t) => normalizeStr(t).includes(needle))
+        (b.tags || []).some((t) => normalizeStr(t).includes(needle)) ||
+        ((b as any).keywords || []).some((k: string) => normalizeStr(k).includes(needle))
     )
     .sort((a, b) => {
       // Prioritize: featured > totalRatings (popularity) > rating
@@ -154,6 +189,8 @@ export async function searchBusinesses(searchQuery: string): Promise<Business[]>
       if ((b.totalRatings || 0) !== (a.totalRatings || 0)) return (b.totalRatings || 0) - (a.totalRatings || 0);
       return (b.rating || 0) - (a.rating || 0);
     });
+  logSearchQuery(searchQuery, results.length, "businesses");
+  return results;
 }
 
 export async function getExistingPlaceIds(placeIds: string[]): Promise<Record<string, string>> {
@@ -751,22 +788,32 @@ export async function createBusiness(data: Omit<Business, "id">): Promise<string
   return docRef.id;
 }
 
-export async function getAllUsers(limitCount = 50): Promise<AppUser[]> {
-  const q = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(limitCount));
+export async function getAllUsers(limitCount = 500): Promise<AppUser[]> {
+  // Note: NOT using orderBy("createdAt") because legacy user docs (created
+  // by signup paths that didn't set createdAt) lack the field — Firestore's
+  // orderBy silently excludes them. Pull all then sort client-side, falling
+  // back to "no date" at the end.
+  const q = query(collection(db, "users"), limit(limitCount));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as AppUser[];
+  const users = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as AppUser[];
+  return users.sort((a: any, b: any) => {
+    const ams = a.createdAt?.toMillis?.() ?? ((a.createdAt?.seconds ?? 0) * 1000);
+    const bms = b.createdAt?.toMillis?.() ?? ((b.createdAt?.seconds ?? 0) * 1000);
+    return bms - ams;
+  });
 }
 
 export async function getAllReviews(limitCount = 50): Promise<Review[]> {
-  const q = query(collection(db, "reviews"), limit(limitCount));
+  // Order by createdAt desc so `limit` actually picks the most recent reviews.
+  // (Without orderBy, Firestore returns docs in ID order — which for reviews
+  // is `{businessId}_{userId}`, totally unrelated to recency.)
+  const q = query(
+    collection(db, "reviews"),
+    orderBy("createdAt", "desc"),
+    limit(limitCount)
+  );
   const snap = await getDocs(q);
-  return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }) as Review)
-    .sort((a, b) => {
-      const aMs = a.createdAt?.toMillis?.() ?? (a.createdAt?.seconds ?? 0) * 1000;
-      const bMs = b.createdAt?.toMillis?.() ?? (b.createdAt?.seconds ?? 0) * 1000;
-      return bMs - aMs;
-    });
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Review);
 }
 
 export async function setUserRole(userId: string, role: "user" | "admin" | "business_owner"): Promise<void> {
@@ -1468,22 +1515,31 @@ export async function getPublicUserProfile(userId: string): Promise<{
   followingCount: number;
   favoriteSpots?: Record<string, string[]>;
 } | null> {
-  const snap = await getDoc(doc(db, "users", userId));
-  if (!snap.exists()) return null;
-  const d = snap.data();
-  return {
-    displayName: d.displayName || "Little Saigon User",
-    photoURL: d.photoURL,
-    headline: d.headline,
-    city: d.city,
-    state: d.state,
-    profileImages: d.profileImages,
-    reviewCount: d.reviewCount || 0,
-    checkInCount: d.checkInCount || 0,
-    followerCount: d.followerCount || 0,
-    followingCount: d.followingCount || 0,
-    favoriteSpots: d.favoriteSpots,
-  };
+  // Use server-side API so unauthenticated visitors (the recipients of share
+  // links) can load the page. Firestore rules gate /users reads to signed-in
+  // users; the API route reads via Admin SDK and returns only public fields.
+  try {
+    const res = await fetch(`/api/public-profile/${encodeURIComponent(userId)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return {
+      displayName: d.displayName,
+      photoURL: d.photoURL || undefined,
+      headline: d.headline || undefined,
+      city: d.city || undefined,
+      state: d.state || undefined,
+      profileImages: d.profileImages || undefined,
+      reviewCount: d.reviewCount || 0,
+      checkInCount: d.checkInCount || 0,
+      followerCount: d.followerCount || 0,
+      followingCount: d.followingCount || 0,
+      favoriteSpots: d.favoriteSpots || undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ============================================
