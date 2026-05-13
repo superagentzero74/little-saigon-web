@@ -10,6 +10,7 @@ import type {
   AppUser, CheckIn, Reward, Redemption, PhotoTag, DishSection, DishFeaturedEntry, ClaimRequest,
   SubcategoryInfo, CategoryInfo, PromoBanner, Promotion, UserOffer, OfferType, PromotionStatus, IssuanceTrigger,
   TicketEvent, Ticket, Notification, BlogPost, BlogAuthor, MenuSection,
+  Customer, CustomerStatus,
 } from "./types";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "./firebase";
@@ -1287,12 +1288,29 @@ export async function removeKeywordFromBusiness(businessId: string, keyword: str
 }
 
 export async function searchBusinessesByName(name: string, max = 10): Promise<Business[]> {
-  // Firestore doesn't support full-text search, so we fetch all and filter client-side
-  // For production, consider Algolia or Typesense
-  const snap = await getDocs(query(collection(db, "businesses"), limit(500)));
+  // Firestore doesn't support full-text search, so we fetch all and filter client-side.
+  // Accent-insensitive; matches across name/address/tags/keywords so colloquial
+  // searches like "banh khot lady" hit even when the canonical name is diacritic-spelled.
+  const snap = await getDocs(query(collection(db, "businesses"), limit(1000)));
   const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Business);
-  const q = name.toLowerCase();
-  return all.filter((b) => b.name.toLowerCase().includes(q)).slice(0, max);
+  const needle = normalizeStr(name);
+  const scored = all
+    .map((b) => {
+      const nameN = normalizeStr(b.name || "");
+      const addrN = normalizeStr(b.address || "");
+      const tagsN = (b.tags || []).map((t) => normalizeStr(t));
+      const kwsN = ((b as any).keywords || []).map((k: string) => normalizeStr(k));
+      let score = 0;
+      if (nameN.startsWith(needle)) score = 100;
+      else if (nameN.includes(needle)) score = 70;
+      else if (tagsN.some((t) => t.includes(needle))) score = 50;
+      else if (kwsN.some((k: string) => k.includes(needle))) score = 40;
+      else if (addrN.includes(needle)) score = 20;
+      return { b, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || (a.b.name || "").localeCompare(b.b.name || ""));
+  return scored.slice(0, max).map((x) => x.b);
 }
 
 export async function uploadNotificationImage(file: File): Promise<string> {
@@ -1641,4 +1659,104 @@ export async function deleteMenuSection(businessId: string, sectionId: string): 
 
 export async function updateMenuImage(businessId: string, url: string | null): Promise<void> {
   await updateDoc(doc(db, "businesses", businessId), { menuImageUrl: url });
+}
+
+// ============================================
+// Customers (Admin CRM)
+// ============================================
+
+export type NewCustomerInput = Omit<Customer, "id" | "createdAt" | "updatedAt" | "uid">;
+
+export async function createCustomer(data: NewCustomerInput): Promise<string> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+  const ref = await addDoc(collection(db, "customers"), {
+    ...data,
+    uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function getCustomer(customerId: string): Promise<Customer | null> {
+  const snap = await getDoc(doc(db, "customers", customerId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as Customer;
+}
+
+export async function updateCustomer(customerId: string, data: Partial<Customer>): Promise<void> {
+  await updateDoc(doc(db, "customers", customerId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteCustomer(customerId: string): Promise<void> {
+  await deleteDoc(doc(db, "customers", customerId));
+}
+
+export async function listCustomers(options?: {
+  status?: CustomerStatus;
+  limitCount?: number;
+}): Promise<Customer[]> {
+  const constraints: any[] = [];
+  if (options?.status) {
+    constraints.push(where("status", "==", options.status));
+    constraints.push(orderBy("followUpSchedule.nextFollowUp", "asc"));
+  } else {
+    constraints.push(orderBy("updatedAt", "desc"));
+  }
+  constraints.push(limit(options?.limitCount ?? 100));
+  const snap = await getDocs(query(collection(db, "customers"), ...constraints));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Customer);
+}
+
+// Client-side name search — same MVP approach as searchBusinesses.
+export async function searchCustomersByName(term: string, max = 50): Promise<Customer[]> {
+  const snap = await getDocs(query(collection(db, "customers"), limit(500)));
+  const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Customer);
+  const needle = normalizeStr(term);
+  return all
+    .filter((c) => normalizeStr(c.contactPerson?.name || "").includes(needle))
+    .slice(0, max);
+}
+
+export async function getCustomersForBusiness(businessId: string): Promise<Customer[]> {
+  const q = query(collection(db, "customers"), where("businessIds", "array-contains", businessId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Customer);
+}
+
+export async function scheduleCustomerFollowUp(customerId: string, schedule: {
+  nextFollowUp: Date | null;
+  followUpType: "call" | "email" | "meeting";
+  notes: string;
+}): Promise<void> {
+  await updateDoc(doc(db, "customers", customerId), {
+    "followUpSchedule.nextFollowUp": schedule.nextFollowUp ? Timestamp.fromDate(schedule.nextFollowUp) : null,
+    "followUpSchedule.followUpType": schedule.followUpType,
+    "followUpSchedule.notes": schedule.notes,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function logCustomerFollowUp(customerId: string, entry: {
+  type: "call" | "email" | "meeting";
+  date: Date;
+  notes: string;
+  clearScheduled?: boolean;
+}): Promise<void> {
+  const update: Record<string, any> = {
+    "followUpSchedule.history": arrayUnion({
+      type: entry.type,
+      date: Timestamp.fromDate(entry.date),
+      notes: entry.notes,
+    }),
+    updatedAt: serverTimestamp(),
+  };
+  if (entry.clearScheduled) {
+    update["followUpSchedule.nextFollowUp"] = null;
+  }
+  await updateDoc(doc(db, "customers", customerId), update);
 }

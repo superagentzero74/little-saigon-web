@@ -99,7 +99,7 @@ export default function AddBusinessPage() {
     try {
       const res = await fetch(`/api/places/search?query=${encodeURIComponent(googleQuery)}`);
       const data = await res.json();
-      const places = (data.results || []).slice(0, 8) as PlaceResult[];
+      const places = (data.results || []).slice(0, 15) as PlaceResult[];
       setResults(places);
       // Check which results already exist in our database
       const placeIds = places.map((p) => p.place_id).filter(Boolean);

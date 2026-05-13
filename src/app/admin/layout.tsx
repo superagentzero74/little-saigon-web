@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket, Calendar, ScanLine, Bell, Tags, Coins, Flag, Camera, FileText, Activity, Trophy, ThumbsUp, Gamepad2, TrendingUp, Heart, UtensilsCrossed, Inbox, History, KeyRound, Search, MessageSquare,
+  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket, Calendar, ScanLine, Bell, Tags, Coins, Flag, Camera, FileText, Activity, Trophy, ThumbsUp, Gamepad2, TrendingUp, Heart, UtensilsCrossed, Inbox, History, KeyRound, Search, MessageSquare, RotateCcw, Handshake,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
@@ -20,6 +20,7 @@ const NAV: (NavItem | NavGroup)[] = [
     { href: "/admin/search-queries", label: "Search Queries", icon: Search },
     { href: "/admin/popular", label: "Popular", icon: TrendingUp },
     { href: "/admin/game-stats", label: "Game Stats", icon: Gamepad2 },
+    { href: "/admin/tienlen-redeals", label: "TL Redeals", icon: RotateCcw },
     { href: "/admin/votes", label: "Votes", icon: ThumbsUp },
     { href: "/admin/search-terms", label: "Search Terms", icon: Tags },
     { href: "/admin/reports", label: "Reports", icon: Flag },
@@ -44,6 +45,7 @@ const NAV: (NavItem | NavGroup)[] = [
   ]},
   { group: "Users & Comms", items: [
     { href: "/admin/users", label: "Users", icon: Users },
+    { href: "/admin/customers", label: "Customers", icon: Handshake },
     { href: "/admin/reviews", label: "Reviews", icon: Star },
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/admin/claims", label: "Claims", icon: Building2 },

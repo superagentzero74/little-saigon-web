@@ -9,9 +9,10 @@ import { MapPin } from "lucide-react";
 
 interface BusinessCardProps {
   business: Business;
+  thumbSize?: number;
 }
 
-export default function BusinessCard({ business }: BusinessCardProps) {
+export default function BusinessCard({ business, thumbSize = 88 }: BusinessCardProps) {
   const slug = businessSlug(business);
   const catInfos = getAllCategoryInfos(business);
   const openStatus = isCurrentlyOpen(business.hours, business.structuredHours);
@@ -21,7 +22,10 @@ export default function BusinessCard({ business }: BusinessCardProps) {
     <Link href={`/business/${slug}`} className="ls-card block group">
       <div className="flex gap-lg">
         {/* Thumbnail */}
-        <div className="relative w-[88px] h-[88px] rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0">
+        <div
+          className="relative rounded-[8px] overflow-hidden bg-ls-surface flex-shrink-0"
+          style={{ width: thumbSize, height: thumbSize }}
+        >
           <div className="absolute inset-0 flex items-center justify-center text-2xl">
             {catInfos[0]?.icon || "🍜"}
           </div>
@@ -29,9 +33,9 @@ export default function BusinessCard({ business }: BusinessCardProps) {
             <OptImage
               src={photoUrl}
               alt={business.name}
-              width={176}
-              height={176}
-              sizes="88px"
+              width={thumbSize * 2}
+              height={thumbSize * 2}
+              sizes={`${thumbSize}px`}
               className="relative w-full h-full object-cover"
             />
           )}

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Center of Little Saigon area (Westminster / Garden Grove / Fountain Valley / Santa Ana)
+// Center of Little Saigon area (Westminster / Garden Grove / Fountain Valley / Santa Ana).
+// Radius covers the broader Vietnamese-American footprint in OC: Westminster, Garden
+// Grove, Fountain Valley, Santa Ana, Anaheim, Orange, Tustin, Fullerton, Huntington
+// Beach, Costa Mesa, Irvine, Brea, Stanton.
 const LITTLE_SAIGON_LAT = 33.7500;
 const LITTLE_SAIGON_LNG = -117.9940;
-const RADIUS_METERS = 4828; // ~3 miles
+const RADIUS_METERS = 20000; // ~12.4 miles
 
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("query");

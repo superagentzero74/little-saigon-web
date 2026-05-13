@@ -64,7 +64,7 @@ export default function CategoryPage() {
           {[...Array(6)].map((_, i) => (
             <div key={i} className="ls-card animate-pulse">
               <div className="flex gap-lg">
-                <div className="w-[88px] h-[88px] rounded-[8px] bg-ls-surface" />
+                <div className="w-[114px] h-[114px] rounded-[8px] bg-ls-surface" />
                 <div className="flex-1">
                   <div className="h-4 bg-ls-surface rounded w-3/4" />
                   <div className="h-3 bg-ls-surface rounded w-1/2 mt-sm" />
@@ -80,7 +80,7 @@ export default function CategoryPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
           {businesses.map((business) => (
-            <BusinessCard key={business.id} business={business} />
+            <BusinessCard key={business.id} business={business} thumbSize={114} />
           ))}
         </div>
       )}

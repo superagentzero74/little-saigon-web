@@ -14,6 +14,8 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  arrayRemove,
+  serverTimestamp,
   type QueryDocumentSnapshot,
   type DocumentData,
 } from "firebase/firestore";
@@ -144,6 +146,16 @@ export default function PhotoReplacementQueuePage() {
     setBusyId(p.id);
     try {
       await deleteDoc(doc(db, "businesses", p.businessId, "photos", p.id));
+      // Mirror the delete to the parent doc's photos array so list views /
+      // hero card stop showing the now-gone URL.
+      if (p.url) {
+        try {
+          await updateDoc(doc(db, "businesses", p.businessId), {
+            photos: arrayRemove(p.url),
+            updatedAt: serverTimestamp(),
+          });
+        } catch { /* non-fatal — the subcollection delete already succeeded */ }
+      }
       setPhotos((prev) => prev.filter((x) => x.id !== p.id));
       flash("Deleted");
     } catch (e) {

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { getBusinessById, getMenuSections } from "@/lib/services";
-import type { Business, MenuSection, MenuItem } from "@/lib/types";
+import type { Business, MenuSection, MenuItem, MenuPeriod } from "@/lib/types";
 import { businessSlug } from "@/lib/utils";
 
 export default function FullMenuPage() {
@@ -15,6 +15,7 @@ export default function FullMenuPage() {
   const [sections, setSections] = useState<MenuSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [period, setPeriod] = useState<MenuPeriod | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -29,6 +30,11 @@ export default function FullMenuPage() {
       setSections(ms);
       // Auto-expand all
       setExpanded(new Set(ms.map((s) => s.id)));
+      // Default tab: prefer "lunch" if any lunch section exists, else "dinner", else null.
+      const periods = new Set(ms.map((s) => s.period).filter(Boolean) as MenuPeriod[]);
+      if (periods.size > 0) {
+        setPeriod(periods.has("lunch") ? "lunch" : "dinner");
+      }
       setLoading(false);
     })();
   }, [slug]);
@@ -79,11 +85,36 @@ export default function FullMenuPage() {
       <h1 className="text-[24px] font-bold text-ls-primary">{business.name}</h1>
       <p className="text-[14px] text-ls-secondary mt-xs mb-xl">Full Menu</p>
 
+      {period && (() => {
+        const hasLunch = sections.some((s) => s.period === "lunch");
+        const hasDinner = sections.some((s) => s.period === "dinner");
+        if (!hasLunch || !hasDinner) return null;
+        return (
+          <div className="flex gap-xs mb-lg border-b border-ls-border">
+            {(["lunch", "dinner"] as MenuPeriod[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-md py-sm text-[14px] font-semibold capitalize border-b-2 -mb-px transition-colors ${
+                  period === p
+                    ? "border-ls-primary text-ls-primary"
+                    : "border-transparent text-ls-secondary hover:text-ls-primary"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
       {sections.length === 0 ? (
         <p className="text-ls-secondary">No menu available.</p>
       ) : (
         <div className="space-y-md">
-          {sections.map((section) => (
+          {sections
+            .filter((s) => !period || !s.period || s.period === period)
+            .map((section) => (
             <div key={section.id} className="bg-white rounded-card border border-ls-border overflow-hidden">
               {/* Section header */}
               <button

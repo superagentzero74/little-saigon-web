@@ -74,6 +74,9 @@ export default function Footer() {
               <Link href="/support?claim=new&name=" className="hover:text-ls-primary transition-colors">
                 List or Claim My Business
               </Link>
+              <Link href="/suggest-business" className="hover:text-ls-primary transition-colors">
+                Suggest a Business
+              </Link>
             </div>
             <div className="flex flex-col gap-sm">
               <span className="font-semibold text-ls-primary text-tag uppercase tracking-wide">Legal</span>

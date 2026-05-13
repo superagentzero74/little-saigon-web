@@ -247,6 +247,31 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Customers — admin CRM for restaurant owners / business clients.
+    // Admin-only read/write. Create enforces the uid + shape contract so
+    // bad clients can't write garbage that breaks list/detail queries.
+    match /customers/{customerId} {
+      function validCustomer(d) {
+        return d.uid is string
+          && d.contactPerson is map
+          && d.contactPerson.name is string && d.contactPerson.name.size() > 0
+          && d.contactPerson.email is string
+          && d.contactPerson.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+          && d.contactPerson.phone is string
+          && d.contactPerson.title is string
+          && d.businessIds is list
+          && d.status in ['active', 'inactive', 'churned']
+          && d.interests is list
+          && d.servicesInterested is list;
+      }
+      allow read:   if isAdmin();
+      allow create: if isAdmin()
+                    && request.resource.data.uid == request.auth.uid
+                    && validCustomer(request.resource.data);
+      allow update: if isAdmin() && validCustomer(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
     // CollectionGroup: photos (needed for admin photo feed query)
     match /{path=**}/photos/{photoId} {
       allow read: if true;

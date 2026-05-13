@@ -548,12 +548,15 @@ export interface MenuItem {
   available: boolean;
 }
 
+export type MenuPeriod = "lunch" | "dinner";
+
 export interface MenuSection {
   id: string;
   name: string;
   nameVi?: string;
   order: number;
   items: MenuItem[];
+  period?: MenuPeriod;        // optional grouping; if any section has it, UI shows tabs
 }
 
 export interface BlogAuthor {
@@ -581,3 +584,53 @@ export interface BlogPost {
   createdAt?: any;
   updatedAt?: any;
 }
+
+// ─── Customers (Admin CRM) ──────────────────────────────
+
+export type CustomerStatus = "active" | "inactive" | "churned";
+export type FollowUpType = "call" | "email" | "meeting";
+
+export interface CustomerContactPerson {
+  name: string;
+  email: string;
+  phone: string;
+  title: string;             // "Owner", "Manager", etc.
+}
+
+export interface FollowUpHistoryEntry {
+  type: FollowUpType;
+  date: any;                 // Firestore Timestamp
+  notes: string;
+}
+
+export interface FollowUpSchedule {
+  nextFollowUp: any | null;  // Firestore Timestamp | null
+  followUpType: FollowUpType;
+  notes: string;
+  history: FollowUpHistoryEntry[];
+}
+
+export interface Customer {
+  id: string;
+  uid: string;               // admin user who created the record
+  createdAt?: any;
+  updatedAt?: any;
+  contactPerson: CustomerContactPerson;
+  interests: string[];
+  servicesInterested: string[];
+  businessIds: string[];     // linked LSgo business IDs
+  followUpSchedule: FollowUpSchedule;
+  customizationNotes: string;
+  status: CustomerStatus;
+}
+
+// LSgo sponsored service offerings — used in the customer creation flow.
+export const CUSTOMER_SERVICE_OPTIONS: string[] = [
+  "Featured Listing",
+  "Promotions",
+  "Events",
+  "Banner Ads",
+  "Social Media",
+  "Sponsored Content",
+  "Newsletter Feature",
+];

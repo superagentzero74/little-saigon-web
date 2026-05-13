@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { Camera, Search, Upload, Loader2, ExternalLink, Image as ImageIcon, AlertTriangle, Check } from "lucide-react";
@@ -166,7 +166,24 @@ export default function PhotoAuditPage() {
         newUrls.push(url);
       }
       const allPhotos = [...existingPhotos, ...newUrls];
-      await updateDoc(doc(db, "businesses", bizId), { photos: allPhotos, active: true });
+      // Mirror to the photos subcollection so detail views (which read from
+      // the subcollection) see these uploads too. Order continues after any
+      // existing subcollection entries.
+      const photosCol = collection(db, "businesses", bizId, "photos");
+      const existingSubSnap = await getDocs(photosCol);
+      let nextOrder = existingSubSnap.size;
+      await Promise.all(
+        newUrls.map((url) =>
+          addDoc(photosCol, {
+            businessId: bizId,
+            url,
+            tag: "other",
+            order: nextOrder++,
+            createdAt: serverTimestamp(),
+          })
+        )
+      );
+      await updateDoc(doc(db, "businesses", bizId), { photos: allPhotos, active: true, updatedAt: serverTimestamp() });
       const updatedBiz = { ...(biz as BizPhoto), photos: allPhotos };
       setBusinesses((prev) => prev.map((b) => b.id === bizId ? updatedBiz : b));
       const newFixed = [...fixed.filter((f) => f.biz.id !== bizId), { biz: updatedBiz, fixedAt: Date.now() }];
