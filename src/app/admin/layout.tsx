@@ -1,69 +1,37 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  LayoutDashboard, Store, Users, Star, BookOpen, LogOut, Building2, FolderTree, Settings, Image, Ticket, Calendar, ScanLine, Bell, Tags, Coins, Flag, Camera, FileText, Activity, Trophy, ThumbsUp, Gamepad2, TrendingUp, Heart, UtensilsCrossed, Inbox, History, KeyRound, Search, MessageSquare, RotateCcw, Handshake,
-} from "lucide-react";
-
-type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
-type NavGroup = { group: string; items: NavItem[] };
-
-const HOME: NavItem = { href: "/admin", label: "Home", icon: LayoutDashboard, exact: true };
-
-const NAV: (NavItem | NavGroup)[] = [
-  { group: "Analytics & Tracking", items: [
-    { href: "/admin/analytics", label: "Analytics", icon: Activity },
-    { href: "/admin/login-attempts", label: "Login Attempts", icon: KeyRound },
-    { href: "/admin/search-queries", label: "Search Queries", icon: Search },
-    { href: "/admin/popular", label: "Popular", icon: TrendingUp },
-    { href: "/admin/game-stats", label: "Game Stats", icon: Gamepad2 },
-    { href: "/admin/tienlen-redeals", label: "TL Redeals", icon: RotateCcw },
-    { href: "/admin/votes", label: "Votes", icon: ThumbsUp },
-    { href: "/admin/search-terms", label: "Search Terms", icon: Tags },
-    { href: "/admin/reports", label: "Reports", icon: Flag },
-  ]},
-  { group: "Content", items: [
-    { href: "/admin/businesses", label: "Businesses", icon: Store },
-    { href: "/admin/categories", label: "Categories", icon: FolderTree },
-    { href: "/admin/guide", label: "Food Guide", icon: BookOpen },
-    { href: "/admin/blog", label: "Blog", icon: FileText },
-    { href: "/admin/recipes", label: "Recipes", icon: UtensilsCrossed },
-    { href: "/admin/photo-audit", label: "Photo Manager", icon: Camera },
-    { href: "/admin/photo-replacement-queue", label: "Replacement Queue", icon: Camera },
-    { href: "/admin/photo-feed", label: "Photo Feed", icon: Heart },
-  ]},
-  { group: "Promotions & Events", items: [
-    { href: "/admin/promotions", label: "Promotions", icon: Ticket },
-    { href: "/admin/rewards", label: "Rewards", icon: Coins },
-    { href: "/admin/challenges", label: "Challenges", icon: Trophy },
-    { href: "/admin/events", label: "Events", icon: Calendar },
-    { href: "/admin/tickets", label: "Tickets", icon: ScanLine },
-    { href: "/admin/banners", label: "Promo Banners", icon: Image },
-  ]},
-  { group: "Users & Comms", items: [
-    { href: "/admin/users", label: "Users", icon: Users },
-    { href: "/admin/customers", label: "Customers", icon: Handshake },
-    { href: "/admin/reviews", label: "Reviews", icon: Star },
-    { href: "/admin/notifications", label: "Notifications", icon: Bell },
-    { href: "/admin/claims", label: "Claims", icon: Building2 },
-    { href: "/admin/inbox", label: "Inbox", icon: Inbox },
-    { href: "/admin/community/reports", label: "Forum Reports", icon: MessageSquare },
-  ]},
-  { group: "Settings", items: [
-    { href: "/admin/settings", label: "Page Settings", icon: Settings },
-  ]},
-  { group: "About", items: [
-    { href: "/admin/build-history", label: "Build History", icon: History },
-  ]},
-];
+import { LogOut, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { NAV, HOME, navGroupSlug, EXPANDED_GROUPS_KEY } from "./_nav";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Expanded nav groups — every group starts collapsed. Persisted to
+  // localStorage so the sidebar remembers which sections you've expanded.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(EXPANDED_GROUPS_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw) as string[];
+        setExpandedGroups(new Set(arr));
+      }
+    } catch { /* ignore parse errors */ }
+  }, []);
+  const toggleGroup = (name: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      try { localStorage.setItem(EXPANDED_GROUPS_KEY, JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -106,6 +74,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="text-[11px] font-semibold uppercase tracking-widest text-white/50 mb-[2px]">Admin</p>
           <p className="text-[15px] font-bold">Little Saigon</p>
         </div>
+        {/* Open public website in a new tab — pinned at the very top of the
+            menu so it's always one click away from inside the admin. */}
+        <a
+          href="/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between gap-sm px-lg py-[10px] text-[13px] font-medium border-b border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <span className="flex items-center gap-sm">
+            <ExternalLink size={16} />
+            Open Website
+          </span>
+          <span className="text-[10px] uppercase tracking-wider text-white/40">new tab</span>
+        </a>
         {/* Home — pinned outside the scrollable nav so it's always reachable */}
         {(() => {
           const active = pathname === HOME.href;
@@ -125,12 +107,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="flex-1 py-md overflow-y-auto">
           {NAV.map((item, idx) => {
             if ("group" in item) {
+              const slug = navGroupSlug(item.group);
+              const onGroupPage = pathname === `/admin/group/${slug}`;
+              // Strictly collapsed by default — only expand when the user
+              // has explicitly toggled this group open.
+              const expanded = expandedGroups.has(item.group);
               return (
                 <div key={item.group} className={idx > 0 ? "mt-[6px]" : ""}>
-                  <p className="px-lg pt-[10px] pb-[4px] text-[10px] font-semibold uppercase tracking-widest text-white/35">
-                    {item.group}
-                  </p>
-                  {item.items.map(({ href, label, icon: Icon, exact }) => {
+                  <div className="flex items-stretch">
+                    <Link
+                      href={`/admin/group/${slug}`}
+                      className={`flex-1 px-lg pt-[10px] pb-[4px] text-[10px] font-semibold uppercase tracking-widest transition-colors ${
+                        onGroupPage ? "text-white" : "text-white/45 hover:text-white/80"
+                      }`}
+                    >
+                      {item.group}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(item.group)}
+                      aria-label={expanded ? "Collapse" : "Expand"}
+                      className="px-md text-white/40 hover:text-white/80 transition-colors"
+                    >
+                      {expanded
+                        ? <ChevronDown size={11} />
+                        : <ChevronRight size={11} />}
+                    </button>
+                  </div>
+                  {expanded && item.items.map(({ href, label, icon: Icon, exact }) => {
                     const active = exact ? pathname === href : pathname.startsWith(href);
                     return (
                       <Link

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle, XCircle, Clock, Building2, User, ExternalLink } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Building2, User, ExternalLink, Phone, Megaphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClaimRequests, approveClaimRequest, denyClaimRequest } from "@/lib/services";
 import type { ClaimRequest } from "@/lib/types";
@@ -97,7 +97,17 @@ export default function ClaimsAdminPage() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-sm mb-xl">
+      <div className="flex gap-sm mb-xl items-center flex-wrap">
+        <span className="text-[12px] font-semibold px-md py-xs rounded-badge bg-ls-primary text-white">
+          Requests
+        </span>
+        <Link
+          href="/admin/claims/businesses"
+          className="text-[12px] font-semibold px-md py-xs rounded-badge bg-ls-surface text-ls-secondary hover:text-ls-primary"
+        >
+          Claimed Businesses
+        </Link>
+        <span className="w-[1px] self-stretch bg-ls-border mx-xs" />
         {(["pending", "all", "approved", "denied"] as const).map((s) => (
           <button
             key={s}
@@ -142,12 +152,25 @@ export default function ClaimsAdminPage() {
                       </Link>
                     </div>
 
-                    <div className="flex items-center gap-sm text-[12px] text-ls-secondary mb-sm">
+                    <div className="flex items-center gap-sm text-[12px] text-ls-secondary mb-xs flex-wrap">
                       <User size={12} className="shrink-0" />
                       <span>{claim.userName || "—"}</span>
                       <span>·</span>
-                      <span>{claim.userEmail}</span>
+                      <a href={`mailto:${claim.userEmail}`} className="underline hover:no-underline">{claim.userEmail}</a>
+                      {claim.phone && (
+                        <>
+                          <span>·</span>
+                          <Phone size={11} className="shrink-0" />
+                          <a href={`tel:${claim.phone}`} className="underline hover:no-underline">{claim.phone}</a>
+                        </>
+                      )}
                     </div>
+
+                    {claim.sponsorshipInterest && (
+                      <div className="inline-flex items-center gap-xs mb-sm text-[11px] font-semibold px-sm py-[2px] rounded-badge bg-amber-100 text-amber-800">
+                        <Megaphone size={11} /> Wants sponsorship info
+                      </div>
+                    )}
 
                     {claim.note && (
                       <p className="text-[13px] text-ls-body bg-ls-surface rounded-btn px-md py-sm mb-sm italic">

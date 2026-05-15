@@ -251,14 +251,19 @@ service cloud.firestore {
     // Admin-only read/write. Create enforces the uid + shape contract so
     // bad clients can't write garbage that breaks list/detail queries.
     match /customers/{customerId} {
+      // Contact requirement: phone OR email (per product spec). Name is
+      // optional — claim conversions may not have it. Email regex is only
+      // enforced when an email is provided.
       function validCustomer(d) {
         return d.uid is string
           && d.contactPerson is map
-          && d.contactPerson.name is string && d.contactPerson.name.size() > 0
+          && d.contactPerson.name is string
           && d.contactPerson.email is string
-          && d.contactPerson.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
           && d.contactPerson.phone is string
           && d.contactPerson.title is string
+          && (d.contactPerson.email.size() > 0 || d.contactPerson.phone.size() > 0)
+          && (d.contactPerson.email.size() == 0
+              || d.contactPerson.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'))
           && d.businessIds is list
           && d.status in ['active', 'inactive', 'churned']
           && d.interests is list

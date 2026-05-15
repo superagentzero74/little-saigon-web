@@ -61,6 +61,7 @@ function SupportContent() {
   const [message, setMessage] = useState(isClaim ? `I would like to claim "${claimBusinessName}".` : "");
   const [phone, setPhone] = useState("");
   const [okToEmail, setOkToEmail] = useState(false);
+  const [sponsorshipInterest, setSponsorshipInterest] = useState(false);
   const [urgentUpdate, setUrgentUpdate] = useState("");
   const [status, setStatus] = useState<FormStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -101,7 +102,7 @@ function SupportContent() {
         body: JSON.stringify({
           name, email, topic, message,
           ...(isClaim ? {
-            phone, okToEmail, urgentUpdate,
+            phone, okToEmail, urgentUpdate, sponsorshipInterest,
             claimBusinessId: claimBusinessId || selectedBiz?.id || "",
             claimBusinessName: claimBusinessName || selectedBiz?.name || newBizName || "",
             newBusiness: notListed,
@@ -192,7 +193,7 @@ function SupportContent() {
 
               <div>
                 <label className="text-meta font-semibold text-ls-primary block mb-xs">
-                  Name
+                  {isClaim ? "Full Name" : "Name"}
                 </label>
                 <input
                   type="text"
@@ -200,7 +201,7 @@ function SupportContent() {
                   onChange={(e) => setName(e.target.value)}
                   required
                   className="w-full border border-ls-border rounded-btn px-lg py-md text-body focus:outline-none focus:border-ls-primary transition-colors"
-                  placeholder="Your name"
+                  placeholder={isClaim ? "First and last name" : "Your name"}
                 />
               </div>
 
@@ -378,6 +379,18 @@ function SupportContent() {
                       className="w-4 h-4 accent-ls-primary"
                     />
                     <span className="text-[14px] text-ls-primary">OK to contact by email</span>
+                  </label>
+
+                  <label className="flex items-start gap-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sponsorshipInterest}
+                      onChange={(e) => setSponsorshipInterest(e.target.checked)}
+                      className="w-4 h-4 mt-[3px] accent-ls-primary shrink-0"
+                    />
+                    <span className="text-[14px] text-ls-primary leading-snug">
+                      I would like more information on promoting my business and sponsorship opportunities.
+                    </span>
                   </label>
 
                   <div>

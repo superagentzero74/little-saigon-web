@@ -110,6 +110,11 @@ export interface ClaimRequest {
   userId: string;
   userName: string;
   userEmail: string;
+  phone?: string;
+  sponsorshipInterest?: boolean;
+  urgentUpdate?: string;
+  newBusiness?: boolean;
+  newBizAddress?: string;
   status: "new" | "pending" | "approved" | "denied";
   note?: string;
   createdAt?: any;

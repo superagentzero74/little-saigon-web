@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ChevronRight, Loader2, CheckCircle, MapPin, Phone, Globe, Star,
   X, ArrowLeft, ArrowRight, Trash2, ImageIcon, Plus, Tag, Upload, Eye,
+  Building2, Mail,
 } from "lucide-react";
 import {
   getBusinessById, updateBusiness, getBusinessPhotos,
@@ -13,7 +14,7 @@ import {
   uploadBusinessPhoto, getSubcategories, syncBusinessPhotos,
 } from "@/lib/services";
 import { db, storage } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { BusinessCategory, LegacyBusinessCategory, BusinessPhoto, PhotoTag, MonVietDish, SubcategoryInfo, StructuredHourSlot } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
@@ -65,6 +66,11 @@ export default function EditBusinessPage() {
 
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState | null>(null);
+  const [claimInfo, setClaimInfo] = useState<{
+    claimed: boolean;
+    ownerEmail: string | null;
+    ownerName: string | null;
+  } | null>(null);
   const initialFormRef = useRef<FormState | null>(null);
   const [photos, setPhotos] = useState<BusinessPhoto[]>([]);
   const [dishes, setDishes] = useState<MonVietDish[]>([]);
@@ -207,6 +213,25 @@ export default function EditBusinessPage() {
     initialFormRef.current = { ...initial, tags: [...initial.tags], categories: [...initial.categories], subcategories: [...initial.subcategories], structuredHours: [...initial.structuredHours] };
     setPhotos(pics);
     setLogoURL(biz.logoURL || null);
+
+    // Resolve claim status + owner contact (email + display name) for the
+    // header notation. Best-effort — failures fall back to "Unclaimed".
+    const claimed = (biz as any).claimed === true;
+    let ownerEmail: string | null = null;
+    let ownerName: string | null = null;
+    const ownerId = (biz as any).ownerId as string | undefined;
+    if (claimed && ownerId) {
+      try {
+        const ownerSnap = await getDoc(doc(db, "users", ownerId));
+        if (ownerSnap.exists()) {
+          const d = ownerSnap.data() as any;
+          ownerEmail = d.email || null;
+          ownerName = d.displayName || null;
+        }
+      } catch { /* fall through */ }
+    }
+    setClaimInfo({ claimed, ownerEmail, ownerName });
+
     setLoading(false);
   }, [businessId, router]);
 
@@ -397,6 +422,44 @@ export default function EditBusinessPage() {
         <ChevronRight size={14} />
         <span className="text-ls-primary truncate max-w-[200px]">{form.name}</span>
       </div>
+
+      {/* Claim status notation */}
+      {claimInfo && (
+        <div
+          className={`mb-md flex items-center gap-sm rounded-card border px-md py-sm text-[13px] ${
+            claimInfo.claimed
+              ? "border-green-300 bg-green-50 text-green-900"
+              : "border-ls-border bg-ls-surface text-ls-secondary"
+          }`}
+        >
+          {claimInfo.claimed ? <CheckCircle size={15} /> : <Building2 size={15} />}
+          <span className="font-semibold">Claim:</span>
+          {claimInfo.claimed ? (
+            <span className="flex flex-wrap items-center gap-xs">
+              <span className="font-semibold">Claimed</span>
+              {claimInfo.ownerEmail && (
+                <span className="flex items-center gap-[3px]">
+                  <Mail size={12} className="opacity-70" />
+                  <a
+                    href={`mailto:${claimInfo.ownerEmail}`}
+                    className="underline hover:no-underline"
+                  >
+                    {claimInfo.ownerEmail}
+                  </a>
+                </span>
+              )}
+              {claimInfo.ownerName && (
+                <span className="opacity-80">({claimInfo.ownerName})</span>
+              )}
+              {!claimInfo.ownerEmail && !claimInfo.ownerName && (
+                <span className="opacity-70">owner record not found</span>
+              )}
+            </span>
+          ) : (
+            <span>Unclaimed</span>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-lg">
         <div>

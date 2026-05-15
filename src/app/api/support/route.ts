@@ -41,10 +41,15 @@ async function sendEmail(to: string, subject: string, html: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, topic, message, phone, okToEmail, urgentUpdate, claimBusinessId, claimBusinessName, userId, newBusiness, newBizAddress } = body;
+    const { name, email, topic, message, phone, okToEmail, urgentUpdate, sponsorshipInterest, claimBusinessId, claimBusinessName, userId, newBusiness, newBizAddress } = body;
 
-    if (!name || !email || !message) {
+    const isClaimEarly = !!(claimBusinessId || claimBusinessName);
+
+    if (!name || !email || (!message && !isClaimEarly)) {
       return NextResponse.json({ error: "Name, email, and message are required" }, { status: 400 });
+    }
+    if (isClaimEarly && (!phone || String(phone).trim().length < 7)) {
+      return NextResponse.json({ error: "Phone number is required to claim a business" }, { status: 400 });
     }
     if (name.length > 200 || email.length > 200 || message.length > 5000) {
       return NextResponse.json({ error: "Input too long" }, { status: 400 });
@@ -70,6 +75,7 @@ export async function POST(request: NextRequest) {
       ticket.claimBusinessName = claimBusinessName || "";
       ticket.phone = phone || "";
       ticket.okToEmail = okToEmail || false;
+      ticket.sponsorshipInterest = !!sponsorshipInterest;
       ticket.urgentUpdate = urgentUpdate || "";
       ticket.newBusiness = newBusiness || false;
       ticket.newBizAddress = newBizAddress || "";
@@ -89,6 +95,7 @@ export async function POST(request: NextRequest) {
         status: "pending",
         note: message.trim(),
         urgentUpdate: urgentUpdate || "",
+        sponsorshipInterest: !!sponsorshipInterest,
         newBusiness: newBusiness || false,
         newBizAddress: newBizAddress || "",
         createdAt: new Date(),
@@ -130,6 +137,7 @@ export async function POST(request: NextRequest) {
           ${isClaim ? `
             <tr><td style="padding: 8px; color: #888;">Business</td><td style="padding: 8px;"><strong>${claimBusinessName || "—"}</strong></td></tr>
             <tr><td style="padding: 8px; color: #888;">Phone</td><td style="padding: 8px;">${phone || "—"}</td></tr>
+            <tr><td style="padding: 8px; color: #888;">Sponsorship Interest</td><td style="padding: 8px;">${sponsorshipInterest ? "<strong style=\"color:#15803d\">YES</strong> — wants info on promotions/sponsorship" : "no"}</td></tr>
             <tr><td style="padding: 8px; color: #888;">Urgent Update</td><td style="padding: 8px;">${urgentUpdate || "—"}</td></tr>
             ${newBusiness ? `<tr><td style="padding: 8px; color: #888;">Type</td><td style="padding: 8px; color: #d97706; font-weight: bold;">NEW BUSINESS (not yet listed)</td></tr>
             <tr><td style="padding: 8px; color: #888;">Address</td><td style="padding: 8px;">${newBizAddress || "—"}</td></tr>` : ""}
