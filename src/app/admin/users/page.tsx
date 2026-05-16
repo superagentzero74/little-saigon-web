@@ -191,12 +191,14 @@ export default function AdminUsersPage() {
                     <img src={selected.photoURL} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-[22px] font-bold text-white">
-                      {selected.displayName?.charAt(0)?.toUpperCase() || "?"}
+                      {(selected.firstName || selected.displayName)?.charAt(0)?.toUpperCase() || "?"}
                     </span>
                   )}
                 </div>
                 <div>
-                  <p className="text-[18px] font-bold text-ls-primary">{selected.displayName || "—"}</p>
+                  <p className="text-[18px] font-bold text-ls-primary">
+                    {[selected.firstName, selected.lastName].filter(Boolean).join(" ") || selected.displayName || "—"}
+                  </p>
                   {selected.headline && <p className="text-[13px] text-ls-secondary">{selected.headline}</p>}
                   <p className="text-[12px] text-ls-secondary">{selected.email}</p>
                 </div>
@@ -232,8 +234,21 @@ export default function AdminUsersPage() {
               <div className="space-y-sm border-t border-ls-border pt-lg">
                 <h3 className="text-[13px] font-semibold text-ls-primary uppercase tracking-wide">Profile</h3>
 
-                {(selected.firstName || selected.lastName) && (
-                  <DetailRow label="Full Name" value={[selected.firstName, selected.lastName].filter(Boolean).join(" ")} />
+                <div className="flex items-start justify-between gap-md">
+                  <span className="text-[12px] text-ls-secondary shrink-0 pt-[2px]">Name</span>
+                  <div className="flex items-start gap-md text-right">
+                    <div>
+                      <p className="text-[13px] text-ls-body">{selected.firstName || "—"}</p>
+                      <p className="text-[10px] text-ls-secondary uppercase tracking-wide mt-[1px]">first</p>
+                    </div>
+                    <div>
+                      <p className="text-[13px] text-ls-body">{selected.lastName || "—"}</p>
+                      <p className="text-[10px] text-ls-secondary uppercase tracking-wide mt-[1px]">last</p>
+                    </div>
+                  </div>
+                </div>
+                {selected.displayName && (selected.displayName !== [selected.firstName, selected.lastName].filter(Boolean).join(" ")) && (
+                  <DetailRow label="Display Name" value={selected.displayName} />
                 )}
                 {selected.nickname && <DetailRow label="Nickname" value={selected.nickname} />}
                 {selected.bio && <DetailRow label="Bio" value={selected.bio} />}
