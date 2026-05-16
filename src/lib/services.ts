@@ -667,7 +667,10 @@ function mapFoodDoc(docId: string, data: any): MonVietDish {
 }
 
 export async function updateDishHeroImage(dishDocId: string, rank: number, file: File): Promise<string> {
-  const ext = file.name.split(".").pop() || "jpg";
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  if (ext === "heic" || ext === "heif" || file.type === "image/heic" || file.type === "image/heif") {
+    throw new Error("HEIC/HEIF is not supported in browsers. Please export as JPG, PNG, or WebP and try again.");
+  }
   const path = `foods/${rank}/hero.${ext}`;
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, file);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Gamepad2, Users, Clock, Trophy, TrendingUp, Activity } from "lucide-react";
+import { Gamepad2, Users, Clock, Trophy, TrendingUp, Activity, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 interface GameEvent {
   id: string;
@@ -23,15 +23,23 @@ interface GameEvent {
 interface UserGameStats {
   uid: string;
   name: string;
+  xu: number;
   tienLen: { games: number; wins: number; totalTime: number };
   blackjack: { games: number; wins: number; totalTime: number };
 }
 
+interface UserInfo { name: string; xu: number }
+
+type DailyKey = "date" | "games" | "players" | "minutes";
+type PlayerKey = "name" | "xu" | "tlGames" | "tlWins" | "tlTime" | "bjGames" | "bjWins" | "bjTime" | "total";
+
 export default function GameStatsPage() {
   const [events, setEvents] = useState<GameEvent[]>([]);
-  const [users, setUsers] = useState<Record<string, string>>({});
+  const [users, setUsers] = useState<Record<string, UserInfo>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"overview" | "players" | "feed">("overview");
+  const [dailySort, setDailySort] = useState<{ key: DailyKey; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
+  const [playerSort, setPlayerSort] = useState<{ key: PlayerKey; dir: "asc" | "desc" }>({ key: "xu", dir: "desc" });
 
   useEffect(() => {
     // Real-time listener for game events
@@ -63,7 +71,7 @@ export default function GameStatsPage() {
       evts.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
       setEvents(evts);
 
-      // Fetch user names
+      // Fetch user names + points
       const missingIds = Array.from(new Set(evts.map((e) => e.userId)))
         .filter((id) => id && id !== "anonymous" && !users[id]);
       if (missingIds.length > 0) {
@@ -71,9 +79,13 @@ export default function GameStatsPage() {
         for (const id of missingIds.slice(0, 30)) {
           try {
             const snap2 = await getDocs(query(collection(db, "users"), where("__name__", "==", id)));
-            if (!snap2.empty) userMap[id] = snap2.docs[0].data().displayName || id.slice(0, 8);
-            else userMap[id] = id.slice(0, 8);
-          } catch { userMap[id] = id.slice(0, 8); }
+            if (!snap2.empty) {
+              const d = snap2.docs[0].data();
+              userMap[id] = { name: d.displayName || id.slice(0, 8), xu: d.xu || 0 };
+            } else {
+              userMap[id] = { name: id.slice(0, 8), xu: 0 };
+            }
+          } catch { userMap[id] = { name: id.slice(0, 8), xu: 0 }; }
         }
         setUsers(userMap);
       }
@@ -138,7 +150,8 @@ export default function GameStatsPage() {
     if (!playerMap[e.userId]) {
       playerMap[e.userId] = {
         uid: e.userId,
-        name: users[e.userId] || e.userId.slice(0, 8),
+        name: users[e.userId]?.name || e.userId.slice(0, 8),
+        xu: users[e.userId]?.xu || 0,
         tienLen: { games: 0, wins: 0, totalTime: 0 },
         blackjack: { games: 0, wins: 0, totalTime: 0 },
       };
@@ -152,13 +165,38 @@ export default function GameStatsPage() {
     if (e.result === "win" || e.place === 1) playerMap[e.userId][g].wins++;
     playerMap[e.userId][g].totalTime += e.duration_seconds || 0;
   }
-  // Update names
+  // Refresh name + points from latest users map
   for (const uid of Object.keys(playerMap)) {
-    if (users[uid]) playerMap[uid].name = users[uid];
+    if (users[uid]) {
+      playerMap[uid].name = users[uid].name;
+      playerMap[uid].xu = users[uid].xu;
+    }
   }
-  const playerList = Object.values(playerMap).sort(
-    (a, b) => (b.tienLen.games + b.blackjack.games) - (a.tienLen.games + a.blackjack.games)
-  );
+
+  const playerSortValue = (p: UserGameStats, key: PlayerKey): string | number => {
+    switch (key) {
+      case "name": return p.name.toLowerCase();
+      case "xu": return p.xu;
+      case "tlGames": return p.tienLen.games;
+      case "tlWins": return p.tienLen.wins;
+      case "tlTime": return p.tienLen.totalTime;
+      case "bjGames": return p.blackjack.games;
+      case "bjWins": return p.blackjack.wins;
+      case "bjTime": return p.blackjack.totalTime;
+      case "total": return p.tienLen.games + p.blackjack.games;
+    }
+  };
+  const playerList = Object.values(playerMap).sort((a, b) => {
+    const av = playerSortValue(a, playerSort.key);
+    const bv = playerSortValue(b, playerSort.key);
+    const cmp = typeof av === "string" && typeof bv === "string" ? av.localeCompare(bv) : (av as number) - (bv as number);
+    return playerSort.dir === "asc" ? cmp : -cmp;
+  });
+
+  const toggleDailySort = (key: DailyKey) =>
+    setDailySort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" }));
+  const togglePlayerSort = (key: PlayerKey) =>
+    setPlayerSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" }));
 
   const fmtTime = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`;
@@ -278,21 +316,33 @@ export default function GameStatsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500 text-xs uppercase">
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Games</th>
-                <th className="px-4 py-3">Players</th>
-                <th className="px-4 py-3">Play Time</th>
+                <SortableTh label="Date" active={dailySort.key === "date"} dir={dailySort.dir} onClick={() => toggleDailySort("date")} />
+                <SortableTh label="Games" active={dailySort.key === "games"} dir={dailySort.dir} onClick={() => toggleDailySort("games")} />
+                <SortableTh label="Players" active={dailySort.key === "players"} dir={dailySort.dir} onClick={() => toggleDailySort("players")} />
+                <SortableTh label="Play Time" active={dailySort.key === "minutes"} dir={dailySort.dir} onClick={() => toggleDailySort("minutes")} />
               </tr>
             </thead>
             <tbody className="divide-y">
-              {[...dailyData].reverse().map((d, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{d.date}</td>
-                  <td className="px-4 py-3">{d.games}</td>
-                  <td className="px-4 py-3">{d.players}</td>
-                  <td className="px-4 py-3">{d.minutes}m</td>
-                </tr>
-              ))}
+              {[...dailyData]
+                .map((d, idx) => ({ ...d, idx }))
+                .sort((a, b) => {
+                  let cmp = 0;
+                  switch (dailySort.key) {
+                    case "date": cmp = a.idx - b.idx; break;
+                    case "games": cmp = a.games - b.games; break;
+                    case "players": cmp = a.players - b.players; break;
+                    case "minutes": cmp = a.minutes - b.minutes; break;
+                  }
+                  return dailySort.dir === "asc" ? cmp : -cmp;
+                })
+                .map((d, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium">{d.date}</td>
+                    <td className="px-4 py-3">{d.games}</td>
+                    <td className="px-4 py-3">{d.players}</td>
+                    <td className="px-4 py-3">{d.minutes}m</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -303,20 +353,22 @@ export default function GameStatsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500 text-xs uppercase">
-                <th className="px-4 py-3">Player</th>
-                <th className="px-4 py-3">TL Games</th>
-                <th className="px-4 py-3">TL Wins</th>
-                <th className="px-4 py-3">TL Time</th>
-                <th className="px-4 py-3">BJ Games</th>
-                <th className="px-4 py-3">BJ Wins</th>
-                <th className="px-4 py-3">BJ Time</th>
-                <th className="px-4 py-3">Total</th>
+                <SortableTh label="Player" active={playerSort.key === "name"} dir={playerSort.dir} onClick={() => togglePlayerSort("name")} />
+                <SortableTh label="Xu" active={playerSort.key === "xu"} dir={playerSort.dir} onClick={() => togglePlayerSort("xu")} />
+                <SortableTh label="TL Games" active={playerSort.key === "tlGames"} dir={playerSort.dir} onClick={() => togglePlayerSort("tlGames")} />
+                <SortableTh label="TL Wins" active={playerSort.key === "tlWins"} dir={playerSort.dir} onClick={() => togglePlayerSort("tlWins")} />
+                <SortableTh label="TL Time" active={playerSort.key === "tlTime"} dir={playerSort.dir} onClick={() => togglePlayerSort("tlTime")} />
+                <SortableTh label="BJ Games" active={playerSort.key === "bjGames"} dir={playerSort.dir} onClick={() => togglePlayerSort("bjGames")} />
+                <SortableTh label="BJ Wins" active={playerSort.key === "bjWins"} dir={playerSort.dir} onClick={() => togglePlayerSort("bjWins")} />
+                <SortableTh label="BJ Time" active={playerSort.key === "bjTime"} dir={playerSort.dir} onClick={() => togglePlayerSort("bjTime")} />
+                <SortableTh label="Total" active={playerSort.key === "total"} dir={playerSort.dir} onClick={() => togglePlayerSort("total")} />
               </tr>
             </thead>
             <tbody className="divide-y">
               {playerList.map((p) => (
                 <tr key={p.uid} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{p.name}</td>
+                  <td className="px-4 py-3">🪙 {p.xu.toLocaleString()}</td>
                   <td className="px-4 py-3">{p.tienLen.games}</td>
                   <td className="px-4 py-3">{p.tienLen.wins}</td>
                   <td className="px-4 py-3">{fmtTime(p.tienLen.totalTime)}</td>
@@ -327,7 +379,7 @@ export default function GameStatsPage() {
                 </tr>
               ))}
               {playerList.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No players yet</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No players yet</td></tr>
               )}
             </tbody>
           </table>
@@ -350,7 +402,7 @@ export default function GameStatsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{eventLabel(e)}</p>
-                <p className="text-xs text-gray-500">{users[e.userId] || e.userId.slice(0, 8)} · {e.platform}</p>
+                <p className="text-xs text-gray-500">{users[e.userId]?.name || e.userId.slice(0, 8)} · {e.platform}</p>
               </div>
               <span className="text-xs text-gray-400 flex-shrink-0">{fmtTimeAgo(e.timestamp)}</span>
             </div>
@@ -361,6 +413,26 @@ export default function GameStatsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Sortable Table Header ──
+
+function SortableTh({ label, active, dir, onClick }: {
+  label: string; active: boolean; dir: "asc" | "desc"; onClick: () => void;
+}) {
+  const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className="px-4 py-3 select-none">
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center gap-1 hover:text-gray-700 ${active ? "text-gray-700" : ""}`}
+      >
+        {label}
+        <Icon size={11} className={active ? "opacity-80" : "opacity-40"} />
+      </button>
+    </th>
   );
 }
 

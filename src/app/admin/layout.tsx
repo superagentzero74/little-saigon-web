@@ -12,23 +12,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
 
-  // Expanded nav groups — every group starts collapsed. Persisted to
-  // localStorage so the sidebar remembers which sections you've expanded.
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  // Accordion: at most one nav group expanded at a time. Every group starts
+  // collapsed; opening one collapses the others. Persisted to localStorage.
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(EXPANDED_GROUPS_KEY);
-      if (raw) {
-        const arr = JSON.parse(raw) as string[];
-        setExpandedGroups(new Set(arr));
-      }
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "string") setExpandedGroup(parsed);
+      else if (Array.isArray(parsed) && parsed.length > 0) setExpandedGroup(parsed[0]);
     } catch { /* ignore parse errors */ }
   }, []);
   const toggleGroup = (name: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
-      try { localStorage.setItem(EXPANDED_GROUPS_KEY, JSON.stringify(Array.from(next))); } catch {}
+    setExpandedGroup((prev) => {
+      const next = prev === name ? null : name;
+      try {
+        if (next) localStorage.setItem(EXPANDED_GROUPS_KEY, JSON.stringify(next));
+        else localStorage.removeItem(EXPANDED_GROUPS_KEY);
+      } catch {}
       return next;
     });
   };
@@ -109,9 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             if ("group" in item) {
               const slug = navGroupSlug(item.group);
               const onGroupPage = pathname === `/admin/group/${slug}`;
-              // Strictly collapsed by default — only expand when the user
-              // has explicitly toggled this group open.
-              const expanded = expandedGroups.has(item.group);
+              const expanded = expandedGroup === item.group;
               return (
                 <div key={item.group} className={idx > 0 ? "mt-[6px]" : ""}>
                   <div className="flex items-stretch">

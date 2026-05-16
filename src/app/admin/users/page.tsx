@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Shield, ShieldOff, X, MapPin, Star, Calendar, ExternalLink } from "lucide-react";
+import { Search, Shield, ShieldOff, X, MapPin, Star, Calendar, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { getAllUsers, setUserRole } from "@/lib/services";
 import type { AppUser } from "@/lib/types";
+
+type SortKey = "user" | "points" | "reviews" | "checkins" | "joined" | "role";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -11,6 +13,7 @@ export default function AdminUsersPage() {
   const [filter, setFilter] = useState("");
   const [msg, setMsg] = useState("");
   const [selected, setSelected] = useState<AppUser | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "joined", dir: "desc" });
 
   useEffect(() => {
     getAllUsers(100).then(setUsers).finally(() => setLoading(false));
@@ -31,11 +34,42 @@ export default function AdminUsersPage() {
     return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  const filtered = users.filter((u) =>
-    !filter ||
-    u.displayName?.toLowerCase().includes(filter.toLowerCase()) ||
-    u.email?.toLowerCase().includes(filter.toLowerCase())
-  );
+  const toMs = (ts: any) => ts?.toMillis?.() ?? (ts?.seconds ? ts.seconds * 1000 : 0);
+  const sortValue = (u: AppUser, key: SortKey): string | number => {
+    switch (key) {
+      case "user": return ([u.firstName, u.lastName].filter(Boolean).join(" ") || u.displayName || u.email || "").toLowerCase();
+      case "points": return u.points || 0;
+      case "reviews": return u.reviewCount || 0;
+      case "checkins": return u.checkInCount || 0;
+      case "joined": return toMs((u as any).createdAt);
+      case "role": return u.role || "user";
+    }
+  };
+  const fullName = (u: AppUser) =>
+    [u.firstName, u.lastName].filter(Boolean).join(" ") || u.displayName || "—";
+
+  const filtered = users
+    .filter((u) => {
+      if (!filter) return true;
+      const q = filter.toLowerCase();
+      return (
+        u.displayName?.toLowerCase().includes(q) ||
+        u.firstName?.toLowerCase().includes(q) ||
+        u.lastName?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      const av = sortValue(a, sort.key);
+      const bv = sortValue(b, sort.key);
+      const cmp = typeof av === "string" && typeof bv === "string"
+        ? av.localeCompare(bv)
+        : (av as number) - (bv as number);
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" }));
 
   return (
     <div className="p-2xl">
@@ -63,12 +97,12 @@ export default function AdminUsersPage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-ls-border bg-gray-50">
-                <th className="text-left px-lg py-md font-semibold text-ls-secondary uppercase tracking-wide text-[11px]">User</th>
-                <th className="text-center px-md py-md font-semibold text-ls-secondary uppercase tracking-wide text-[11px]">Points</th>
-                <th className="text-center px-md py-md font-semibold text-ls-secondary uppercase tracking-wide text-[11px]">Reviews</th>
-                <th className="text-center px-md py-md font-semibold text-ls-secondary uppercase tracking-wide text-[11px]">Check-ins</th>
-                <th className="text-left px-md py-md font-semibold text-ls-secondary uppercase tracking-wide text-[11px] hidden md:table-cell">Joined</th>
-                <th className="text-center px-md py-md font-semibold text-ls-secondary uppercase tracking-wide text-[11px]">Role</th>
+                <SortableTh label="User" align="left" sortKey="user" sort={sort} onClick={toggleSort} extraClass="px-lg" />
+                <SortableTh label="Points" align="center" sortKey="points" sort={sort} onClick={toggleSort} />
+                <SortableTh label="Reviews" align="center" sortKey="reviews" sort={sort} onClick={toggleSort} />
+                <SortableTh label="Check-ins" align="center" sortKey="checkins" sort={sort} onClick={toggleSort} />
+                <SortableTh label="Joined" align="left" sortKey="joined" sort={sort} onClick={toggleSort} extraClass="hidden md:table-cell" />
+                <SortableTh label="Role" align="center" sortKey="role" sort={sort} onClick={toggleSort} />
                 <th className="px-md py-md" />
               </tr>
             </thead>
@@ -92,12 +126,12 @@ export default function AdminUsersPage() {
                           <img src={u.photoURL} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-[12px] font-bold text-white">
-                            {u.displayName?.charAt(0)?.toUpperCase() || "?"}
+                            {(u.firstName || u.displayName)?.charAt(0)?.toUpperCase() || "?"}
                           </span>
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-ls-primary">{u.displayName || "—"}</p>
+                        <p className="font-medium text-ls-primary">{fullName(u)}</p>
                         <p className="text-[11px] text-ls-secondary">{u.email}</p>
                       </div>
                     </div>
@@ -255,6 +289,32 @@ export default function AdminUsersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function SortableTh({ label, align, sortKey, sort, onClick, extraClass = "" }: {
+  label: string;
+  align: "left" | "center";
+  sortKey: SortKey;
+  sort: { key: SortKey; dir: "asc" | "desc" };
+  onClick: (k: SortKey) => void;
+  extraClass?: string;
+}) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  const alignClass = align === "left" ? "text-left" : "text-center";
+  const justify = align === "left" ? "justify-start" : "justify-center";
+  return (
+    <th className={`${alignClass} px-md py-md font-semibold text-ls-secondary uppercase tracking-wide text-[11px] ${extraClass}`}>
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        className={`inline-flex items-center gap-1 w-full ${justify} hover:text-ls-primary ${active ? "text-ls-primary" : ""}`}
+      >
+        {label}
+        <Icon size={11} className={active ? "opacity-80" : "opacity-40"} />
+      </button>
+    </th>
   );
 }
 

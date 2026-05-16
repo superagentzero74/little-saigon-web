@@ -40,8 +40,11 @@ export default function Header() {
   }, []);
 
   // Hide header on admin pages — admin has its own sidebar nav.
+  // Also hide on the QR landing (`/app`) so the download page reads as a
+  // standalone landing rather than a normal site page.
   // (Returned AFTER all hooks so hook count stays consistent across renders.)
   if (pathname.startsWith("/admin")) return null;
+  if (pathname === "/app" || pathname.startsWith("/app/")) return null;
 
   const suggestedSearches = [
     "Phở", "Bánh Mì", "Bún Bò Huế", "Cơm Tấm", "Boba",

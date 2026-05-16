@@ -9,8 +9,10 @@ const InstagramFeed = dynamic(() => import("./InstagramFeed"), { ssr: false });
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide footer on admin pages — admin has its own layout
+  // Hide footer on admin pages — admin has its own layout.
+  // Also hide on the QR landing (`/app`) so the download page is bare.
   if (pathname.startsWith("/admin")) return null;
+  if (pathname === "/app" || pathname.startsWith("/app/")) return null;
 
   return (
     <footer className="border-t border-ls-border mt-3xl">
