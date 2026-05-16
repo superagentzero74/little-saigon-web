@@ -276,7 +276,7 @@ export interface Pick {
 
 export const CATEGORIES: Record<BusinessCategory, { label: string; icon: string }> = {
   restaurant: { label: "Restaurants", icon: "🍜" },
-  coffee_tea: { label: "Coffee & Tea", icon: "☕" },
+  coffee_tea: { label: "Cafés & Drinks", icon: "☕" },
   bakery_dessert: { label: "Bakery & Dessert", icon: "🥖" },
   grocery: { label: "Grocery & Markets", icon: "🛒" },
   beauty: { label: "Beauty & Wellness", icon: "💅" },

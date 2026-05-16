@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const CATEGORIES: { id: string; label: string }[] = [
   { id: "restaurant", label: "Restaurant" },
-  { id: "coffee_tea", label: "Coffee & Tea" },
+  { id: "coffee_tea", label: "Cafés & Drinks" },
   { id: "bakery_dessert", label: "Bakery & Dessert" },
   { id: "grocery", label: "Grocery & Market" },
   { id: "beauty", label: "Beauty & Wellness" },

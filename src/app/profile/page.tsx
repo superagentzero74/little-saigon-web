@@ -1043,7 +1043,7 @@ export default function ProfilePage() {
 
 // ── Favorite Spots Categories ──
 const SPOT_CATS = [
-  { id: "cafe_drinks", label: "Cafe & Drinks", filterCats: ["coffee_tea", "cafe"] },
+  { id: "cafe_drinks", label: "Cafés & Drinks", filterCats: ["coffee_tea", "cafe"] },
   { id: "bakery", label: "Bakery", filterCats: ["bakery_dessert", "bakery"] },
   { id: "restaurant", label: "Restaurants", filterCats: ["restaurant"] },
   { id: "pho", label: "Pho", filterCats: ["restaurant"] },

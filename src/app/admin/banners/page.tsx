@@ -13,7 +13,7 @@ import type { PromoBanner, MonVietDish, SubcategoryInfo } from "@/lib/types";
 
 const CATEGORIES = [
   { value: "restaurant", label: "Restaurants" },
-  { value: "coffee_tea", label: "Coffee & Tea" },
+  { value: "coffee_tea", label: "Cafés & Drinks" },
   { value: "bakery_dessert", label: "Bakery & Dessert" },
   { value: "grocery", label: "Grocery & Markets" },
   { value: "beauty", label: "Beauty & Wellness" },
